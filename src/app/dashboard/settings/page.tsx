@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +18,15 @@ import {
   ExternalLink,
   Check,
   Loader2,
+  Sparkles,
+  Pencil,
+  Trash2,
+  Plus,
+  Phone,
+  Mail,
+  X,
 } from "lucide-react";
+import { PLANS, getPlanLimits } from "@/lib/stripe";
 
 const tabs = [
   { id: "profile", label: "Business Profile", icon: Building2 },
@@ -27,11 +37,7 @@ const tabs = [
   { id: "sms", label: "SMS Settings", icon: MessageSquare },
 ];
 
-const PLAN_DETAILS: Record<string, { name: string; monthlyPrice: number; limits: { followUpsPerMonth: number } }> = {
-  starter: { name: "Starter", monthlyPrice: 29, limits: { followUpsPerMonth: 200 } },
-  growth: { name: "Growth", monthlyPrice: 59, limits: { followUpsPerMonth: 1000 } },
-  pro: { name: "Pro", monthlyPrice: 99, limits: { followUpsPerMonth: Infinity } },
-};
+type PlanKey = keyof typeof PLANS;
 
 export default function SettingsPage() {
   return (
@@ -51,6 +57,23 @@ interface ProfileForm {
   brandPrimaryColor: string;
   brandSecondaryColor: string;
   googleReviewUrl: string;
+  logoUrl: string;
+}
+
+interface LocationItem {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  _count: { followUps: number };
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
 }
 
 function SettingsContent() {
@@ -65,20 +88,83 @@ function SettingsContent() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [business, setBusiness] = useState<Record<string, unknown> | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
 
   // Profile form state
   const [profileForm, setProfileForm] = useState<ProfileForm>({
     name: "", type: "", email: "", phone: "",
     websiteUrl: "", bookingUrl: "",
     brandPrimaryColor: "#0D9488", brandSecondaryColor: "#0F766E",
-    googleReviewUrl: "",
+    googleReviewUrl: "", logoUrl: "",
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [autoBrandLoading, setAutoBrandLoading] = useState(false);
+
+  // Session for role-based UI
+  const { data: sessionData } = useSession();
+  const currentUserRole = (sessionData?.user as Record<string, unknown> | undefined)?.role as string | undefined;
+  const currentUserId = sessionData?.user?.id;
+
+  // Locations state
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const [locationsFetched, setLocationsFetched] = useState(false);
+  const [showAddLocation, setShowAddLocation] = useState(false);
+  const [locationForm, setLocationForm] = useState({ name: "", address: "", phone: "" });
+  const [locationSaving, setLocationSaving] = useState(false);
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
+  const [editLocationForm, setEditLocationForm] = useState({ name: "", address: "", phone: "" });
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Team state
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamFetched, setTeamFetched] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [teamForm, setTeamForm] = useState({ name: "", email: "", password: "", role: "staff" });
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [teamError, setTeamError] = useState<string | null>(null);
+
+  // Lazy-fetch locations
+  const fetchLocations = useCallback(async () => {
+    setLocationsLoading(true);
+    try {
+      const res = await fetch("/api/locations");
+      if (res.ok) setLocations(await res.json());
+    } catch { /* ignore */ } finally {
+      setLocationsLoading(false);
+      setLocationsFetched(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "locations" && !locationsFetched) fetchLocations();
+  }, [activeTab, locationsFetched, fetchLocations]);
+
+  // Lazy-fetch team
+  const fetchTeam = useCallback(async () => {
+    setTeamLoading(true);
+    try {
+      const res = await fetch("/api/team");
+      if (res.ok) setTeamMembers(await res.json());
+    } catch { /* ignore */ } finally {
+      setTeamLoading(false);
+      setTeamFetched(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "team" && !teamFetched) fetchTeam();
+  }, [activeTab, teamFetched, fetchTeam]);
 
   useEffect(() => {
     fetch("/api/business")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
       .then((data) => {
         setBusiness(data);
         setProfileForm({
@@ -91,6 +177,7 @@ function SettingsContent() {
           brandPrimaryColor: (data.brandPrimaryColor as string) || "#0D9488",
           brandSecondaryColor: (data.brandSecondaryColor as string) || "#0F766E",
           googleReviewUrl: (data.googleReviewUrl as string) || "",
+          logoUrl: (data.logoUrl as string) || "",
         });
       })
       .catch(() => {});
@@ -111,6 +198,9 @@ function SettingsContent() {
           websiteUrl: profileForm.websiteUrl,
           bookingUrl: profileForm.bookingUrl,
           googleReviewUrl: profileForm.googleReviewUrl,
+          brandPrimaryColor: profileForm.brandPrimaryColor,
+          brandSecondaryColor: profileForm.brandSecondaryColor,
+          logoUrl: profileForm.logoUrl,
         }),
       });
       if (res.ok) {
@@ -126,12 +216,156 @@ function SettingsContent() {
     }
   };
 
+  const handleAutoBrand = async () => {
+    if (!profileForm.websiteUrl.trim()) return;
+    setAutoBrandLoading(true);
+    try {
+      const res = await fetch("/api/business/auto-brand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: profileForm.websiteUrl, persist: true }),
+      });
+      if (res.ok) {
+        // Refresh business data
+        const bizRes = await fetch("/api/business");
+        if (bizRes.ok) {
+          const data = await bizRes.json();
+          setBusiness(data);
+          setProfileForm((prev) => ({
+            ...prev,
+            brandPrimaryColor: (data.brandPrimaryColor as string) || prev.brandPrimaryColor,
+            brandSecondaryColor: (data.brandSecondaryColor as string) || prev.brandSecondaryColor,
+            logoUrl: (data.logoUrl as string) || prev.logoUrl,
+            phone: (data.phone as string) || prev.phone,
+            googleReviewUrl: (data.googleReviewUrl as string) || prev.googleReviewUrl,
+          }));
+        }
+      }
+    } catch {
+      // Auto-brand failed
+    } finally {
+      setAutoBrandLoading(false);
+    }
+  };
+
   const updateProfile = (field: keyof ProfileForm, value: string) => {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const currentPlan = (business?.plan as string) || "starter";
-  const planInfo = PLAN_DETAILS[currentPlan] || PLAN_DETAILS.starter;
+  // ── Location handlers ──────────────────────────────────
+  const handleAddLocation = async () => {
+    if (!locationForm.name.trim()) return;
+    setLocationSaving(true);
+    setLocationError(null);
+    try {
+      const res = await fetch("/api/locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(locationForm),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setLocations((prev) => [...prev, created]);
+        setLocationForm({ name: "", address: "", phone: "" });
+        setShowAddLocation(false);
+      } else {
+        const data = await res.json();
+        setLocationError(data.error || "Failed to add location");
+      }
+    } catch { setLocationError("Failed to add location"); } finally { setLocationSaving(false); }
+  };
+
+  const handleUpdateLocation = async (id: string) => {
+    if (!editLocationForm.name.trim()) return;
+    setLocationSaving(true);
+    setLocationError(null);
+    try {
+      const res = await fetch(`/api/locations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editLocationForm),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLocations((prev) => prev.map((l) => (l.id === id ? updated : l)));
+        setEditingLocationId(null);
+      } else {
+        const data = await res.json();
+        setLocationError(data.error || "Failed to update location");
+      }
+    } catch { setLocationError("Failed to update location"); } finally { setLocationSaving(false); }
+  };
+
+  const handleDeleteLocation = async (id: string) => {
+    setLocationError(null);
+    try {
+      const res = await fetch(`/api/locations/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setLocations((prev) => prev.filter((l) => l.id !== id));
+      } else {
+        const data = await res.json();
+        setLocationError(data.error || "Failed to delete location");
+      }
+    } catch { setLocationError("Failed to delete location"); }
+  };
+
+  // ── Team handlers ─────────────────────────────────────
+  const handleAddMember = async () => {
+    if (!teamForm.name.trim() || !teamForm.email.trim() || !teamForm.password) return;
+    setTeamSaving(true);
+    setTeamError(null);
+    try {
+      const res = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamForm),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setTeamMembers((prev) => [...prev, created]);
+        setTeamForm({ name: "", email: "", password: "", role: "staff" });
+        setShowAddMember(false);
+      } else {
+        const data = await res.json();
+        setTeamError(data.error || "Failed to add member");
+      }
+    } catch { setTeamError("Failed to add member"); } finally { setTeamSaving(false); }
+  };
+
+  const handleUpdateMemberRole = async (id: string, role: string) => {
+    setTeamError(null);
+    try {
+      const res = await fetch(`/api/team/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTeamMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+        setEditingMemberId(null);
+      } else {
+        const data = await res.json();
+        setTeamError(data.error || "Failed to update role");
+      }
+    } catch { setTeamError("Failed to update role"); }
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    setTeamError(null);
+    try {
+      const res = await fetch(`/api/team/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+      } else {
+        const data = await res.json();
+        setTeamError(data.error || "Failed to remove member");
+      }
+    } catch { setTeamError("Failed to remove member"); }
+  };
+
+  const currentPlan = ((business?.plan as string) || "starter") as PlanKey;
+  const planInfo = PLANS[currentPlan] || PLANS.starter;
   const isOnTrial = !!business?.trialEndsAt;
   const hasStripe = !!business?.stripeCustomerId;
 
@@ -156,7 +390,7 @@ function SettingsContent() {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, interval: "monthly" }),
+        body: JSON.stringify({ planId, interval: billingInterval }),
       });
       const data = await res.json();
       if (data.url) {
@@ -217,10 +451,21 @@ function SettingsContent() {
 
               <div className="space-y-5">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center">
-                    <span className="text-xl font-bold text-teal-700">
-                      {profileForm.name.slice(0, 2).toUpperCase() || "BZ"}
-                    </span>
+                  <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center overflow-hidden">
+                    {profileForm.logoUrl ? (
+                      <Image
+                        src={profileForm.logoUrl}
+                        alt="Business logo"
+                        width={64}
+                        height={64}
+                        className="object-contain w-full h-full"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-xl font-bold text-teal-700">
+                        {profileForm.name.slice(0, 2).toUpperCase() || "BZ"}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <Button variant="outline" size="sm">
@@ -271,17 +516,49 @@ function SettingsContent() {
                   </div>
                 </div>
 
+                {/* Auto-detect branding button */}
+                {profileForm.websiteUrl.trim() && (
+                  <div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAutoBrand}
+                      disabled={autoBrandLoading}
+                      className="text-teal-600 border-teal-200 hover:bg-teal-50"
+                    >
+                      {autoBrandLoading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 mr-2" />
+                      )}
+                      Auto-detect branding from website
+                    </Button>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-warm-700 mb-1.5">
                     Brand Colors
                   </label>
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg border border-warm-200" style={{ backgroundColor: profileForm.brandPrimaryColor }} />
+                      <label className="text-xs text-warm-400">Primary</label>
+                      <input
+                        type="color"
+                        value={profileForm.brandPrimaryColor}
+                        onChange={(e) => updateProfile("brandPrimaryColor", e.target.value)}
+                        className="w-8 h-8 rounded-lg border border-warm-200 cursor-pointer p-0.5"
+                      />
                       <Input value={profileForm.brandPrimaryColor} onChange={(e) => updateProfile("brandPrimaryColor", e.target.value)} className="w-28 text-sm" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg border border-warm-200" style={{ backgroundColor: profileForm.brandSecondaryColor }} />
+                      <label className="text-xs text-warm-400">Secondary</label>
+                      <input
+                        type="color"
+                        value={profileForm.brandSecondaryColor}
+                        onChange={(e) => updateProfile("brandSecondaryColor", e.target.value)}
+                        className="w-8 h-8 rounded-lg border border-warm-200 cursor-pointer p-0.5"
+                      />
                       <Input value={profileForm.brandSecondaryColor} onChange={(e) => updateProfile("brandSecondaryColor", e.target.value)} className="w-28 text-sm" />
                     </div>
                   </div>
@@ -380,9 +657,36 @@ function SettingsContent() {
                   <h2 className="text-lg text-warm-900 font-[family-name:var(--font-display)] mb-4">
                     Upgrade Your Plan
                   </h2>
-                  <p className="text-sm text-warm-400 mb-6">
+                  <p className="text-sm text-warm-400 mb-4">
                     Get more follow-ups, locations, and features.
                   </p>
+
+                  {/* Monthly / Annual toggle */}
+                  <div className="flex justify-center mb-6">
+                    <div className="inline-flex items-center gap-3 bg-warm-50 rounded-full p-1 border border-warm-200">
+                      <button
+                        onClick={() => setBillingInterval("monthly")}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          billingInterval === "monthly"
+                            ? "bg-teal-600 text-white"
+                            : "text-warm-500 hover:text-warm-700"
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        onClick={() => setBillingInterval("annual")}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          billingInterval === "annual"
+                            ? "bg-teal-600 text-white"
+                            : "text-warm-500 hover:text-warm-700"
+                        }`}
+                      >
+                        Annual
+                        <span className="ml-1.5 text-xs opacity-80">Save 20%</span>
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     {(["growth", "pro"] as const)
@@ -391,7 +695,8 @@ function SettingsContent() {
                         return (planOrder[p] || 0) > (planOrder[currentPlan as keyof typeof planOrder] || 0);
                       })
                       .map((planId) => {
-                        const plan = PLAN_DETAILS[planId];
+                        const plan = PLANS[planId];
+                        const displayPrice = billingInterval === "annual" ? plan.annualPrice : plan.monthlyPrice;
                         return (
                           <div
                             key={planId}
@@ -401,15 +706,27 @@ function SettingsContent() {
                                 : "border-warm-200"
                             }`}
                           >
-                            <h3 className="font-semibold text-warm-800">
-                              {plan.name}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-warm-800">
+                                {plan.name}
+                              </h3>
+                              {billingInterval === "annual" && (
+                                <Badge className="bg-green-50 text-green-700 text-[10px]">
+                                  Save 20%
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-2xl font-bold text-warm-900 mt-1">
-                              ${plan.monthlyPrice}
+                              ${displayPrice}
                               <span className="text-sm font-normal text-warm-400">
                                 /mo
                               </span>
                             </p>
+                            {billingInterval === "annual" && (
+                              <p className="text-xs text-warm-400 mt-0.5">
+                                Billed ${displayPrice * 12}/year
+                              </p>
+                            )}
                             <ul className="mt-3 space-y-1.5">
                               <li className="flex items-center gap-2 text-sm text-warm-600">
                                 <Check className="w-3.5 h-3.5 text-teal-500" />
@@ -513,36 +830,423 @@ function SettingsContent() {
             </div>
           )}
 
-          {(activeTab === "locations" ||
-            activeTab === "team" ||
-            activeTab === "sms") && (
+          {activeTab === "locations" && (
+            <div className="bg-white rounded-xl border border-warm-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg text-warm-900 font-[family-name:var(--font-display)]">
+                    Locations
+                  </h2>
+                  <p className="text-sm text-warm-400 mt-0.5">
+                    {locations.length} of {planInfo.limits.locations === Infinity ? "unlimited" : planInfo.limits.locations} location{planInfo.limits.locations !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                {locations.length < planInfo.limits.locations ? (
+                  <Button
+                    size="sm"
+                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                    onClick={() => { setShowAddLocation(true); setLocationError(null); }}
+                    disabled={showAddLocation}
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Add Location
+                  </Button>
+                ) : (
+                  <div className="text-right">
+                    <p className="text-xs text-amber-600 font-medium">Location limit reached</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 text-teal-600 border-teal-200 hover:bg-teal-50 text-xs"
+                      onClick={() => handleUpgrade("growth")}
+                      disabled={checkoutLoading === "growth"}
+                    >
+                      Upgrade Plan
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {locationError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 flex items-center justify-between">
+                  {locationError}
+                  <button onClick={() => setLocationError(null)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                </div>
+              )}
+
+              {locationsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-warm-400" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Add location form */}
+                  {showAddLocation && (
+                    <div className="border border-teal-200 bg-teal-50/30 rounded-lg p-4">
+                      <div className="grid sm:grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
+                          <Input
+                            placeholder="e.g. Main Office"
+                            value={locationForm.name}
+                            onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Address</label>
+                          <Input
+                            placeholder="123 Main St"
+                            value={locationForm.address}
+                            onChange={(e) => setLocationForm((f) => ({ ...f, address: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Phone</label>
+                          <Input
+                            placeholder="(555) 123-4567"
+                            value={locationForm.phone}
+                            onChange={(e) => setLocationForm((f) => ({ ...f, phone: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-teal-600 hover:bg-teal-700 text-white"
+                          onClick={handleAddLocation}
+                          disabled={locationSaving || !locationForm.name.trim()}
+                        >
+                          {locationSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setShowAddLocation(false); setLocationForm({ name: "", address: "", phone: "" }); setLocationError(null); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Location cards */}
+                  {locations.map((loc) => (
+                    <div key={loc.id} className="border border-warm-100 rounded-lg p-4">
+                      {editingLocationId === loc.id ? (
+                        <>
+                          <div className="grid sm:grid-cols-3 gap-3 mb-3">
+                            <div>
+                              <label className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
+                              <Input
+                                value={editLocationForm.name}
+                                onChange={(e) => setEditLocationForm((f) => ({ ...f, name: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-warm-600 mb-1">Address</label>
+                              <Input
+                                value={editLocationForm.address}
+                                onChange={(e) => setEditLocationForm((f) => ({ ...f, address: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-warm-600 mb-1">Phone</label>
+                              <Input
+                                value={editLocationForm.phone}
+                                onChange={(e) => setEditLocationForm((f) => ({ ...f, phone: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-teal-600 hover:bg-teal-700 text-white"
+                              onClick={() => handleUpdateLocation(loc.id)}
+                              disabled={locationSaving || !editLocationForm.name.trim()}
+                            >
+                              {locationSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Check className="w-4 h-4 mr-1.5" />}
+                              Save
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setEditingLocationId(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-warm-800">{loc.name}</h3>
+                              <Badge className="bg-warm-100 text-warm-500 text-[10px]">
+                                {loc._count.followUps} follow-up{loc._count.followUps !== 1 ? "s" : ""}
+                              </Badge>
+                            </div>
+                            {loc.address && (
+                              <p className="text-sm text-warm-400 mt-0.5 flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5" /> {loc.address}
+                              </p>
+                            )}
+                            {loc.phone && (
+                              <p className="text-sm text-warm-400 mt-0.5 flex items-center gap-1">
+                                <Phone className="w-3.5 h-3.5" /> {loc.phone}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                setEditingLocationId(loc.id);
+                                setEditLocationForm({ name: loc.name, address: loc.address || "", phone: loc.phone || "" });
+                                setLocationError(null);
+                              }}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteLocation(loc.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {locations.length === 0 && !showAddLocation && (
+                    <div className="text-center py-8">
+                      <MapPin className="w-8 h-8 text-warm-300 mx-auto mb-2" />
+                      <p className="text-sm text-warm-400">No locations yet. Add your first location.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "team" && (
+            <div className="bg-white rounded-xl border border-warm-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg text-warm-900 font-[family-name:var(--font-display)]">
+                    Team Members
+                  </h2>
+                  <p className="text-sm text-warm-400 mt-0.5">
+                    {teamMembers.length} of {planInfo.limits.teamMembers === Infinity ? "unlimited" : planInfo.limits.teamMembers} member{planInfo.limits.teamMembers !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                {(currentUserRole === "owner" || currentUserRole === "admin") && (
+                  teamMembers.length < planInfo.limits.teamMembers ? (
+                    <Button
+                      size="sm"
+                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      onClick={() => { setShowAddMember(true); setTeamError(null); }}
+                      disabled={showAddMember}
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      Invite Member
+                    </Button>
+                  ) : (
+                    <div className="text-right">
+                      <p className="text-xs text-amber-600 font-medium">Team limit reached</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 text-teal-600 border-teal-200 hover:bg-teal-50 text-xs"
+                        onClick={() => handleUpgrade("growth")}
+                        disabled={checkoutLoading === "growth"}
+                      >
+                        Upgrade Plan
+                      </Button>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {teamError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 flex items-center justify-between">
+                  {teamError}
+                  <button onClick={() => setTeamError(null)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                </div>
+              )}
+
+              {currentUserRole === "staff" && (
+                <div className="mb-4 p-3 bg-warm-50 border border-warm-100 rounded-lg text-sm text-warm-500">
+                  Contact your admin to manage team members.
+                </div>
+              )}
+
+              {teamLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-warm-400" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Add member form */}
+                  {showAddMember && (
+                    <div className="border border-teal-200 bg-teal-50/30 rounded-lg p-4">
+                      <div className="grid sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
+                          <Input
+                            placeholder="Full name"
+                            value={teamForm.name}
+                            onChange={(e) => setTeamForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Email *</label>
+                          <Input
+                            type="email"
+                            placeholder="email@example.com"
+                            value={teamForm.email}
+                            onChange={(e) => setTeamForm((f) => ({ ...f, email: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Temporary Password * (min 8 chars)</label>
+                          <Input
+                            type="password"
+                            placeholder="Min 8 characters"
+                            value={teamForm.password}
+                            onChange={(e) => setTeamForm((f) => ({ ...f, password: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-warm-600 mb-1">Role</label>
+                          <select
+                            value={teamForm.role}
+                            onChange={(e) => setTeamForm((f) => ({ ...f, role: e.target.value }))}
+                            className="w-full h-9 rounded-md border border-warm-200 bg-white px-3 text-sm text-warm-700"
+                          >
+                            <option value="staff">Staff</option>
+                            {currentUserRole === "owner" && <option value="admin">Admin</option>}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-teal-600 hover:bg-teal-700 text-white"
+                          onClick={handleAddMember}
+                          disabled={teamSaving || !teamForm.name.trim() || !teamForm.email.trim() || teamForm.password.length < 8}
+                        >
+                          {teamSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setShowAddMember(false); setTeamForm({ name: "", email: "", password: "", role: "staff" }); setTeamError(null); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Team member rows */}
+                  {teamMembers.map((member) => {
+                    const isOwner = member.role === "owner";
+                    const isSelf = member.id === currentUserId;
+                    const canManage = (currentUserRole === "owner" || currentUserRole === "admin") && !isOwner;
+                    const canDelete = canManage && !isSelf && !(currentUserRole === "admin" && member.role === "admin");
+                    const initials = member.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
+                    return (
+                      <div key={member.id} className="border border-warm-100 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${
+                            isOwner ? "bg-teal-100 text-teal-700" : member.role === "admin" ? "bg-blue-100 text-blue-700" : "bg-warm-100 text-warm-600"
+                          }`}>
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-warm-800 text-sm">{member.name}</span>
+                              <Badge className={`text-[10px] ${
+                                isOwner ? "bg-teal-50 text-teal-700" : member.role === "admin" ? "bg-blue-50 text-blue-700" : "bg-warm-100 text-warm-500"
+                              }`}>
+                                {member.role}
+                              </Badge>
+                              {isSelf && <span className="text-[10px] text-warm-400">(you)</span>}
+                            </div>
+                            <p className="text-xs text-warm-400 flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> {member.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {canManage && editingMemberId === member.id ? (
+                            <div className="flex items-center gap-2">
+                              <select
+                                defaultValue={member.role}
+                                onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)}
+                                className="h-8 rounded-md border border-warm-200 bg-white px-2 text-xs text-warm-700"
+                              >
+                                <option value="staff">Staff</option>
+                                {currentUserRole === "owner" && <option value="admin">Admin</option>}
+                              </select>
+                              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditingMemberId(null)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : canManage ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => { setEditingMemberId(member.id); setTeamError(null); }}
+                              >
+                                Change Role
+                              </Button>
+                              {canDelete && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleDeleteMember(member.id)}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {teamMembers.length === 0 && !showAddMember && (
+                    <div className="text-center py-8">
+                      <Users className="w-8 h-8 text-warm-300 mx-auto mb-2" />
+                      <p className="text-sm text-warm-400">No team members found.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "sms" && (
             <div className="bg-white rounded-xl border border-warm-100 shadow-sm p-12 text-center">
               <div className="w-12 h-12 rounded-full bg-warm-100 flex items-center justify-center mx-auto mb-4">
-                <Building2 className="w-6 h-6 text-warm-400" />
+                <MessageSquare className="w-6 h-6 text-warm-400" />
               </div>
               <h3 className="text-lg text-warm-700 font-[family-name:var(--font-display)] mb-2">
                 Coming Soon
               </h3>
               <p className="text-sm text-warm-400 max-w-sm mx-auto">
-                {activeTab === "locations" &&
-                  "Multi-location management is available on Growth and Pro plans."}
-                {activeTab === "team" &&
-                  "Team management is available on Growth and Pro plans."}
-                {activeTab === "sms" &&
-                  "Custom SMS settings including sender name and compliance options are coming soon."}
+                Custom SMS settings including sender name and compliance options are coming soon.
               </p>
-              {(activeTab === "locations" || activeTab === "team") && (
-                <Button
-                  className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
-                  onClick={() => handleUpgrade("growth")}
-                  disabled={checkoutLoading === "growth"}
-                >
-                  {checkoutLoading === "growth" && (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  )}
-                  Upgrade to Growth
-                </Button>
-              )}
             </div>
           )}
         </div>

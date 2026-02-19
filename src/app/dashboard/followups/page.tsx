@@ -54,9 +54,10 @@ export default function FollowUpsPage() {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (q) params.set("search", q);
       const res = await fetch(`/api/followups?${params}`);
+      if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setFollowUps(data.data);
-      setPagination(data.pagination);
+      setFollowUps(data.data || []);
+      if (data.pagination) setPagination(data.pagination);
     } catch {
       // fail silently
     } finally {

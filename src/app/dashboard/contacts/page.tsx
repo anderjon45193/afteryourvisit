@@ -37,7 +37,11 @@ import {
   Check,
   AlertCircle,
   Pencil,
+  Loader2,
+  Tag,
+  ChevronDown,
 } from "lucide-react";
+import { TagInput } from "@/components/dashboard/tag-input";
 import Link from "next/link";
 
 interface Contact {
@@ -171,13 +175,28 @@ function ContactsPage() {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showImportSheet, setShowImportSheet] = useState(false);
 
+  // Tags
+  const [allBusinessTags, setAllBusinessTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState("");
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [bulkTagMode, setBulkTagMode] = useState<"tag" | "untag" | null>(null);
+  const [bulkTagValue, setBulkTagValue] = useState("");
+
   // Detail edit mode
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "", tags: [] as string[] });
 
   // Add contact form
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
   const [addError, setAddError] = useState("");
+
+  // Bulk send state
+  const [showBulkSend, setShowBulkSend] = useState(false);
+  const [bulkSendTemplateId, setBulkSendTemplateId] = useState("");
+  const [bulkSendNotes, setBulkSendNotes] = useState("");
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkSendResult, setBulkSendResult] = useState<{ sent: number; failed: number; skippedOptOut: number } | null>(null);
+  const [templates, setTemplates] = useState<{ id: string; name: string; isDefault: boolean }[]>([]);
 
   // Import state
   const [importStep, setImportStep] = useState(1);
@@ -197,6 +216,17 @@ function ContactsPage() {
     }
   }, [searchParams]);
 
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contacts/tags");
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setAllBusinessTags(data.tags || []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const fetchContacts = useCallback(async (page = 1) => {
     setLoading(true);
     try {
@@ -208,21 +238,43 @@ function ContactsPage() {
       });
       if (search) params.set("search", search);
       if (filter && filter !== "all") params.set("filter", filter);
+      if (tagFilter) params.set("tag", tagFilter);
 
       const res = await fetch(`/api/contacts?${params}`);
+      if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setContacts(data.data);
-      setPagination(data.pagination);
+      setContacts(data.data || []);
+      if (data.pagination) setPagination(data.pagination);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [search, filter, sortField, sortDir]);
+  }, [search, filter, tagFilter, sortField, sortDir]);
 
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
+  // Fetch templates for bulk send
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/templates");
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      const list = (Array.isArray(data) ? data : data.data || []) as { id: string; name: string; isDefault: boolean }[];
+      setTemplates(list);
+      const defaultTemplate = list.find((t) => t.isDefault);
+      if (defaultTemplate) setBulkSendTemplateId(defaultTemplate.id);
+      else if (list.length > 0) setBulkSendTemplateId(list[0].id);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -234,6 +286,7 @@ function ContactsPage() {
   const openDetail = async (contactId: string) => {
     try {
       const res = await fetch(`/api/contacts/${contactId}`);
+      if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setDetailContact(data);
       setEditing(false);
@@ -250,6 +303,7 @@ function ContactsPage() {
       phone: detailContact.phone,
       email: detailContact.email || "",
       notes: detailContact.notes || "",
+      tags: [...detailContact.tags],
     });
     setEditing(true);
   };
@@ -266,12 +320,14 @@ function ContactsPage() {
           phone: editForm.phone,
           email: editForm.email || null,
           notes: editForm.notes || null,
+          tags: editForm.tags,
         }),
       });
       const updated = await res.json();
       setDetailContact({ ...detailContact, ...updated });
       setEditing(false);
       fetchContacts();
+      fetchTags();
     } catch {
       // ignore
     }
@@ -320,6 +376,68 @@ function ContactsPage() {
       });
       setSelectedIds(new Set());
       fetchContacts();
+    } catch {
+      // ignore
+    }
+  };
+
+  // Bulk send
+  const openBulkSend = () => {
+    if (templates.length === 0) fetchTemplates();
+    setBulkSendResult(null);
+    setBulkSendNotes("");
+    setShowBulkSend(true);
+  };
+
+  const handleBulkSend = async () => {
+    if (!bulkSendTemplateId) return;
+    setBulkSending(true);
+    setBulkSendResult(null);
+    try {
+      const res = await fetch("/api/followups/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactIds: Array.from(selectedIds),
+          templateId: bulkSendTemplateId,
+          customNotes: bulkSendNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      setBulkSendResult({ sent: data.sent, failed: data.failed, skippedOptOut: data.skippedOptOut });
+    } catch {
+      setBulkSendResult({ sent: 0, failed: selectedIds.size, skippedOptOut: 0 });
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
+  const closeBulkSend = () => {
+    setShowBulkSend(false);
+    if (bulkSendResult) {
+      setSelectedIds(new Set());
+      fetchContacts();
+    }
+  };
+
+  // Bulk tag/untag
+  const handleBulkTag = async () => {
+    if (!bulkTagValue.trim() || !bulkTagMode) return;
+    try {
+      await fetch("/api/contacts/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: bulkTagMode,
+          contactIds: Array.from(selectedIds),
+          tag: bulkTagValue.trim().toLowerCase(),
+        }),
+      });
+      setBulkTagMode(null);
+      setBulkTagValue("");
+      setSelectedIds(new Set());
+      fetchContacts();
+      fetchTags();
     } catch {
       // ignore
     }
@@ -399,7 +517,7 @@ function ContactsPage() {
   };
 
   // Empty state
-  if (!loading && contacts.length === 0 && !search && filter === "all") {
+  if (!loading && contacts.length === 0 && !search && filter === "all" && !tagFilter) {
     return (
       <>
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -655,6 +773,14 @@ function ContactsPage() {
                         <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone" />
                         <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" />
                         <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Notes" className="resize-none" />
+                        <div>
+                          <label className="block text-xs font-medium text-warm-500 mb-1">Tags</label>
+                          <TagInput
+                            tags={editForm.tags}
+                            onChange={(tags) => setEditForm({ ...editForm, tags })}
+                            existingTags={allBusinessTags}
+                          />
+                        </div>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
                           <Button size="sm" onClick={saveEdit} className="bg-teal-600 hover:bg-teal-700 text-white">Save</Button>
@@ -736,6 +862,115 @@ function ContactsPage() {
     );
   }
 
+  function renderBulkSendSheet() {
+    const selectedTemplate = templates.find((t) => t.id === bulkSendTemplateId);
+    return (
+      <Sheet open={showBulkSend} onOpenChange={(open) => { if (!open) closeBulkSend(); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Send Bulk Follow-Up</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-5">
+            {!bulkSendResult ? (
+              <>
+                <div className="p-3 bg-teal-50 rounded-lg border border-teal-100">
+                  <p className="text-sm text-teal-800">
+                    Send follow-up to <span className="font-semibold">{selectedIds.size}</span> contact{selectedIds.size !== 1 ? "s" : ""}
+                    {selectedTemplate ? ` using "${selectedTemplate.name}"` : ""}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Template</label>
+                  {templates.length === 0 ? (
+                    <p className="text-sm text-warm-400">Loading templates...</p>
+                  ) : (
+                    <Select value={bulkSendTemplateId} onValueChange={setBulkSendTemplateId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.isDefault ? " (Default)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    Notes <span className="text-warm-400 font-normal">(optional)</span>
+                  </label>
+                  <Textarea
+                    value={bulkSendNotes}
+                    onChange={(e) => setBulkSendNotes(e.target.value)}
+                    placeholder="Custom notes for all follow-ups..."
+                    className="resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleBulkSend}
+                  disabled={bulkSending || !bulkSendTemplateId}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  {bulkSending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send to {selectedIds.size} Contact{selectedIds.size !== 1 ? "s" : ""}
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
+                  <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-green-800">Bulk Send Complete</p>
+                    <p className="text-sm text-green-600">
+                      {bulkSendResult.sent} sent
+                      {bulkSendResult.failed > 0 && `, ${bulkSendResult.failed} failed`}
+                      {bulkSendResult.skippedOptOut > 0 && `, ${bulkSendResult.skippedOptOut} skipped (opted out)`}
+                    </p>
+                  </div>
+                </div>
+                {bulkSendResult.skippedOptOut > 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                    <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      {bulkSendResult.skippedOptOut} contact{bulkSendResult.skippedOptOut !== 1 ? "s were" : " was"} skipped because they opted out of messages.
+                    </p>
+                  </div>
+                )}
+                {bulkSendResult.failed > 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-red-700">
+                      {bulkSendResult.failed} follow-up{bulkSendResult.failed !== 1 ? "s" : ""} failed to send. Check your SMS settings.
+                    </p>
+                  </div>
+                )}
+                <Button onClick={closeBulkSend} className="w-full bg-teal-600 hover:bg-teal-700 text-white">
+                  Done
+                </Button>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
     <>
       {/* Header */}
@@ -786,6 +1021,44 @@ function ContactsPage() {
               {f.label}
             </button>
           ))}
+          {/* Tag filter */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (tagFilter) {
+                  setTagFilter("");
+                } else {
+                  setShowTagDropdown(!showTagDropdown);
+                }
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
+                tagFilter
+                  ? "bg-teal-600 text-white"
+                  : "bg-warm-50 text-warm-500 hover:bg-warm-100"
+              }`}
+            >
+              <Tag className="w-3 h-3" />
+              {tagFilter ? `Tag: ${tagFilter}` : "Tag"}
+              {!tagFilter && <ChevronDown className="w-3 h-3" />}
+              {tagFilter && <X className="w-3 h-3" />}
+            </button>
+            {showTagDropdown && allBusinessTags.length > 0 && (
+              <div className="absolute top-full mt-1 left-0 z-20 bg-white border border-warm-100 rounded-lg shadow-md min-w-[140px] max-h-48 overflow-y-auto">
+                {allBusinessTags.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTagFilter(t);
+                      setShowTagDropdown(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-warm-700 hover:bg-teal-50 transition-colors"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -953,6 +1226,33 @@ function ContactsPage() {
             <Button
               size="sm"
               variant="ghost"
+              onClick={openBulkSend}
+              className="text-teal-300 hover:text-teal-100 hover:bg-teal-900/30"
+            >
+              <Send className="w-4 h-4 mr-1.5" />
+              Send Follow-Up
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setBulkTagMode("tag"); setBulkTagValue(""); }}
+              className="text-teal-300 hover:text-teal-100 hover:bg-teal-900/30"
+            >
+              <Tag className="w-4 h-4 mr-1.5" />
+              Tag
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setBulkTagMode("untag"); setBulkTagValue(""); }}
+              className="text-amber-300 hover:text-amber-100 hover:bg-amber-900/30"
+            >
+              <Tag className="w-4 h-4 mr-1.5" />
+              Untag
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={handleBulkDelete}
               className="text-red-300 hover:text-red-100 hover:bg-red-900/30"
             >
@@ -962,6 +1262,34 @@ function ContactsPage() {
             <button onClick={() => setSelectedIds(new Set())} className="text-warm-400 hover:text-white p-1">
               <X className="w-4 h-4" />
             </button>
+
+            {/* Bulk tag input popover */}
+            {bulkTagMode && (
+              <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg border border-warm-100 px-3 py-2 flex items-center gap-2">
+                <span className="text-xs text-warm-500 whitespace-nowrap">
+                  {bulkTagMode === "tag" ? "Add tag:" : "Remove tag:"}
+                </span>
+                <Input
+                  value={bulkTagValue}
+                  onChange={(e) => setBulkTagValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleBulkTag(); }}
+                  placeholder="tag name"
+                  className="h-7 text-sm w-32"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={handleBulkTag}
+                  disabled={!bulkTagValue.trim()}
+                  className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  Apply
+                </Button>
+                <button onClick={() => setBulkTagMode(null)} className="text-warm-400 hover:text-warm-600">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -969,6 +1297,7 @@ function ContactsPage() {
       {renderAddSheet()}
       {renderImportSheet()}
       {renderDetailSheet()}
+      {renderBulkSendSheet()}
     </>
   );
 }

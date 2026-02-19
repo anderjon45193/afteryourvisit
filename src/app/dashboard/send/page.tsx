@@ -95,8 +95,12 @@ function SendFollowUpPage() {
     nameRef.current?.focus();
 
     fetch("/api/templates")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
       .then((data) => {
+        if (!Array.isArray(data)) return;
         setTemplates(data);
         const defaultTpl = data.find((t: Record<string, unknown>) => t.isDefault);
         if (defaultTpl) setTemplateId(defaultTpl.id);
@@ -105,15 +109,23 @@ function SendFollowUpPage() {
       .catch(() => {});
 
     fetch("/api/snippets")
-      .then((r) => r.json())
-      .then((data) => setSnippets(data))
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setSnippets(data);
+      })
       .catch(() => {});
 
     // Pre-fill from contactId query param
     const contactId = searchParams.get("contactId");
     if (contactId) {
       fetch(`/api/contacts/${contactId}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed");
+          return r.json();
+        })
         .then((data) => {
           if (data.firstName) {
             setFirstName(data.firstName);
@@ -132,7 +144,10 @@ function SendFollowUpPage() {
       return;
     }
     fetch(`/api/contacts/search?q=${encodeURIComponent(query)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
       .then((data) => {
         setContactSuggestions(data);
         setShowSuggestions(data.length > 0);

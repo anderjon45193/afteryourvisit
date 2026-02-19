@@ -1,8 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,8 +21,11 @@ import {
   Building2,
   User,
   Palette,
+  Sparkles,
   AlertCircle,
+  Globe,
 } from "lucide-react";
+import type { AutoBrandResult } from "@/lib/auto-brand-types";
 
 const businessTypes = [
   { value: "dentist", label: "Dentist / Orthodontist" },
@@ -32,10 +37,13 @@ const businessTypes = [
   { value: "other", label: "Other" },
 ];
 
+const TOTAL_STEPS = 4;
+
 const steps = [
   { number: 1, label: "Your Account", icon: User },
   { number: 2, label: "Your Business", icon: Building2 },
-  { number: 3, label: "Personalize", icon: Palette },
+  { number: 3, label: "Your Brand", icon: Sparkles },
+  { number: 4, label: "Personalize", icon: Palette },
 ];
 
 export default function SignUpPage() {
@@ -64,23 +72,100 @@ function SignUpForm() {
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
 
-  // Step 3: Personalize
+  // Step 3: Brand (auto-detected)
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [brandResult, setBrandResult] = useState<AutoBrandResult | null>(null);
+  const [brandError, setBrandError] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState("#0D9488");
+  const [brandSecondaryColor, setBrandSecondaryColor] = useState("#0F766E");
+  const [detectedPhone, setDetectedPhone] = useState("");
+  const [detectedGoogleReview, setDetectedGoogleReview] = useState("");
+
+  // Step 4: Personalize
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [bookingUrl, setBookingUrl] = useState("");
 
   const canProceedStep1 = name.trim() && email.trim() && password.length >= 8;
   const canProceedStep2 = businessName.trim() && businessType;
 
+  // Visible steps (skip step 3 if no website URL)
+  const hasWebsite = websiteUrl.trim().length > 0;
+
+  const getVisibleStep = (logicalStep: number): number => {
+    if (!hasWebsite && logicalStep >= 3) return logicalStep + 1;
+    return logicalStep;
+  };
+
+  const getLogicalStep = (visibleStep: number): number => {
+    if (!hasWebsite && visibleStep >= 3) return visibleStep - 1;
+    return visibleStep;
+  };
+
+  const visibleSteps = hasWebsite
+    ? steps
+    : steps.filter((s) => s.number !== 3);
+
   const handleNext = () => {
     setError("");
-    if (step < 3) setStep(step + 1);
+    if (step === 2 && !hasWebsite) {
+      // Skip brand step
+      setStep(4);
+    } else if (step < TOTAL_STEPS) {
+      setStep(step + 1);
+    }
   };
 
   const handleBack = () => {
     setError("");
-    if (step > 1) setStep(step - 1);
+    if (step === 4 && !hasWebsite) {
+      setStep(2);
+    } else if (step > 1) {
+      setStep(step - 1);
+    }
   };
+
+  const fetchBranding = useCallback(async () => {
+    if (!websiteUrl.trim()) return;
+    setBrandLoading(true);
+    setBrandError(false);
+    setBrandResult(null);
+    try {
+      const res = await fetch("/api/business/auto-brand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: websiteUrl }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data: AutoBrandResult = await res.json();
+      setBrandResult(data);
+      if (data.logo?.value) setLogoUrl(data.logo.value);
+      if (data.primaryColor?.value) setBrandPrimaryColor(data.primaryColor.value);
+      if (data.secondaryColor?.value) setBrandSecondaryColor(data.secondaryColor.value);
+      if (data.phone?.value) setDetectedPhone(data.phone.value);
+      if (data.googleReviewUrl?.value) setDetectedGoogleReview(data.googleReviewUrl.value);
+    } catch {
+      setBrandError(true);
+    } finally {
+      setBrandLoading(false);
+    }
+  }, [websiteUrl]);
+
+  // Auto-fetch branding when entering step 3
+  useEffect(() => {
+    if (step === 3 && hasWebsite && !brandResult && !brandLoading) {
+      fetchBranding();
+    }
+  }, [step, hasWebsite, brandResult, brandLoading, fetchBranding]);
+
+  // Pre-fill google review URL from auto-detect when entering step 4
+  useEffect(() => {
+    if (step === 4 && detectedGoogleReview && !googleReviewUrl) {
+      setGoogleReviewUrl(detectedGoogleReview);
+    }
+  }, [step, detectedGoogleReview, googleReviewUrl]);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -97,8 +182,14 @@ function SignUpForm() {
           businessName,
           businessType,
           businessPhone,
+          websiteUrl: websiteUrl || undefined,
           googleReviewUrl,
           bookingUrl,
+          logoUrl: logoUrl || undefined,
+          brandPrimaryColor,
+          brandSecondaryColor,
+          autoBrandFetched: !!brandResult,
+          autoBrandData: brandResult || undefined,
         }),
       });
 
@@ -110,7 +201,18 @@ function SignUpForm() {
         return;
       }
 
-      router.push("/sign-in?registered=true");
+      // Auto-sign-in and redirect to onboarding wizard
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResult?.ok) {
+        router.push("/dashboard/welcome");
+      } else {
+        router.push("/sign-in?registered=true");
+      }
     } catch {
       setError("Network error. Please try again.");
       setLoading(false);
@@ -137,7 +239,7 @@ function SignUpForm() {
 
         {/* Progress steps */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {steps.map((s, i) => (
+          {visibleSteps.map((s, i) => (
             <div key={s.number} className="flex items-center">
               <div
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
@@ -154,9 +256,9 @@ function SignUpForm() {
                   <s.icon className="w-3 h-3" />
                 )}
                 <span className="hidden sm:inline">{s.label}</span>
-                <span className="sm:hidden">{s.number}</span>
+                <span className="sm:hidden">{i + 1}</span>
               </div>
-              {i < steps.length - 1 && (
+              {i < visibleSteps.length - 1 && (
                 <div
                   className={`w-8 h-px mx-1 ${
                     step > s.number ? "bg-teal-300" : "bg-warm-200"
@@ -299,6 +401,31 @@ function SignUpForm() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    Website URL{" "}
+                    <span className="text-warm-300 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-300" />
+                    <Input
+                      type="url"
+                      placeholder="www.yourbusiness.com"
+                      value={websiteUrl}
+                      onChange={(e) => {
+                        setWebsiteUrl(e.target.value);
+                        // Reset brand result when URL changes
+                        setBrandResult(null);
+                        setBrandError(false);
+                      }}
+                      className="h-11 pl-10"
+                    />
+                  </div>
+                  <p className="text-xs text-warm-300 mt-1">
+                    We&apos;ll auto-detect your logo and brand colors
+                  </p>
+                </div>
+
                 <div className="flex gap-3">
                   <Button
                     onClick={handleBack}
@@ -321,8 +448,173 @@ function SignUpForm() {
             </div>
           )}
 
-          {/* Step 3: Personalize */}
+          {/* Step 3: Brand (auto-detected) */}
           {step === 3 && (
+            <div>
+              <h1 className="text-2xl text-warm-900 mb-1">
+                Your brand
+              </h1>
+              <p className="text-sm text-warm-400 mb-6">
+                {brandLoading
+                  ? "Analyzing your website..."
+                  : brandError
+                  ? "We couldn't detect everything — you can set these manually."
+                  : "We detected these from your website. Feel free to adjust."}
+              </p>
+
+              {brandLoading ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-warm-100" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-warm-100 rounded w-3/4" />
+                      <div className="h-3 bg-warm-50 rounded w-1/2" />
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="h-10 bg-warm-100 rounded w-1/2" />
+                    <div className="h-10 bg-warm-100 rounded w-1/2" />
+                  </div>
+                  <div className="h-10 bg-warm-100 rounded" />
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Logo preview */}
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-2">
+                      Logo
+                    </label>
+                    {logoUrl ? (
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl border border-warm-100 bg-warm-50 flex items-center justify-center overflow-hidden">
+                          <Image
+                            src={logoUrl}
+                            alt="Detected logo"
+                            width={64}
+                            height={64}
+                            className="object-contain w-full h-full"
+                            unoptimized
+                          />
+                        </div>
+                        <div className="text-sm">
+                          <p className="text-warm-600">Logo detected</p>
+                          {brandResult?.logo && (
+                            <p className="text-xs text-warm-300">
+                              via {brandResult.logo.source}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-warm-400">
+                        No logo detected. You can upload one later in settings.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Brand colors */}
+                  <div>
+                    <label className="block text-sm font-medium text-warm-700 mb-2">
+                      Brand Colors
+                    </label>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs text-warm-400 mb-1">
+                          Primary
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={brandPrimaryColor}
+                            onChange={(e) => setBrandPrimaryColor(e.target.value)}
+                            className="w-10 h-10 rounded-lg border border-warm-200 cursor-pointer p-0.5"
+                          />
+                          <Input
+                            value={brandPrimaryColor}
+                            onChange={(e) => setBrandPrimaryColor(e.target.value)}
+                            className="flex-1 text-sm h-10"
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-warm-400 mb-1">
+                          Secondary
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={brandSecondaryColor}
+                            onChange={(e) => setBrandSecondaryColor(e.target.value)}
+                            className="w-10 h-10 rounded-lg border border-warm-200 cursor-pointer p-0.5"
+                          />
+                          <Input
+                            value={brandSecondaryColor}
+                            onChange={(e) => setBrandSecondaryColor(e.target.value)}
+                            className="flex-1 text-sm h-10"
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detected info summary */}
+                  {(detectedPhone || detectedGoogleReview) && (
+                    <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
+                      <p className="text-xs font-medium text-teal-700 uppercase tracking-wider mb-2">
+                        Also detected
+                      </p>
+                      <div className="space-y-1 text-sm">
+                        {detectedPhone && (
+                          <p className="text-teal-800">
+                            <span className="text-teal-500">Phone: </span>
+                            {detectedPhone}
+                          </p>
+                        )}
+                        {detectedGoogleReview && (
+                          <p className="text-teal-800">
+                            <span className="text-teal-500">Google Reviews: </span>
+                            Found
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {brandError && (
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+                      <p className="text-sm text-amber-700">
+                        We couldn&apos;t auto-detect your branding. You can set your colors manually above, or skip and update them later in settings.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <Button
+                  onClick={handleBack}
+                  variant="outline"
+                  className="h-11"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={brandLoading}
+                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+                >
+                  Continue
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Personalize */}
+          {step === 4 && (
             <div>
               <h1 className="text-2xl text-warm-900 mb-1">
                 Last step — personalize
@@ -347,6 +639,7 @@ function SignUpForm() {
                   />
                   <p className="text-xs text-warm-300 mt-1">
                     This is the link your clients will use to leave a review.
+                    {detectedGoogleReview && !googleReviewUrl && " (Auto-detected from your website)"}
                   </p>
                 </div>
 
@@ -387,6 +680,19 @@ function SignUpForm() {
                       {businessTypes.find((bt) => bt.value === businessType)
                         ?.label || businessType}
                     </p>
+                    {brandResult && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-warm-400">Brand: </span>
+                        <div
+                          className="w-4 h-4 rounded-sm border border-warm-200"
+                          style={{ backgroundColor: brandPrimaryColor }}
+                        />
+                        <div
+                          className="w-4 h-4 rounded-sm border border-warm-200"
+                          style={{ backgroundColor: brandSecondaryColor }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

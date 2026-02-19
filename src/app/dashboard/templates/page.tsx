@@ -32,7 +32,11 @@ import {
   X,
   GripVertical,
   Loader2,
+  Eye,
+  PenLine,
 } from "lucide-react";
+import { PhoneFrame } from "@/components/dashboard/phone-frame";
+import { FollowUpPreview } from "@/components/dashboard/follow-up-preview";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -276,6 +280,13 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Business data for preview
+  const [businessName, setBusinessName] = useState("");
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState("#14B8A6");
+
+  // Mobile preview toggle
+  const [showPreview, setShowPreview] = useState(false);
+
   // Sheet / editor state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("create");
@@ -288,8 +299,13 @@ export default function TemplatesPage() {
   const fetchTemplates = useCallback(() => {
     setLoading(true);
     fetch("/api/templates")
-      .then((r) => r.json())
-      .then((data) => setTemplates(data))
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setTemplates(data);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -297,6 +313,20 @@ export default function TemplatesPage() {
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  // Fetch business data for preview
+  useEffect(() => {
+    fetch("/api/business")
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then((data) => {
+        if (data.name) setBusinessName(data.name);
+        if (data.brandPrimaryColor) setBrandPrimaryColor(data.brandPrimaryColor);
+      })
+      .catch(() => {});
+  }, []);
 
   // ─── Editor helpers ──────────────────────────────────
 
@@ -596,12 +626,12 @@ export default function TemplatesPage() {
       )}
 
       {/* ─── Template Editor Sheet ──────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); if (!open) setShowPreview(false); }}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-lg overflow-y-auto"
+          className="w-full sm:max-w-4xl overflow-hidden p-0"
         >
-          <SheetHeader>
+          <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-warm-900">{sheetTitle}</SheetTitle>
             <SheetDescription>
               {editorMode === "edit"
@@ -610,136 +640,179 @@ export default function TemplatesPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-5 px-4 pb-24">
-            {/* Name */}
-            <div>
-              <label className="text-xs font-medium text-warm-700 mb-1.5 block">
-                Template Name
-              </label>
-              <Input
-                value={editor.name}
-                onChange={(e) =>
-                  setEditor({ ...editor, name: e.target.value })
-                }
-                placeholder="e.g. Standard Cleaning"
-                className="text-sm"
-              />
-            </div>
+          {/* Mobile toggle */}
+          <div className="sm:hidden flex gap-2 px-6 pb-2">
+            <button
+              onClick={() => setShowPreview(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                !showPreview ? "bg-teal-600 text-white" : "bg-warm-50 text-warm-500"
+              }`}
+            >
+              <PenLine className="w-3 h-3" />
+              Editor
+            </button>
+            <button
+              onClick={() => setShowPreview(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                showPreview ? "bg-teal-600 text-white" : "bg-warm-50 text-warm-500"
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              Preview
+            </button>
+          </div>
 
-            {/* SMS Message */}
-            <div>
-              <label className="text-xs font-medium text-warm-700 mb-1.5 block">
-                SMS Message
-              </label>
-              <Textarea
-                value={editor.smsMessage}
-                onChange={(e) =>
-                  setEditor({ ...editor, smsMessage: e.target.value })
-                }
-                placeholder="Hi {{firstName}}! ..."
-                className="text-sm min-h-[80px]"
-              />
-              <p className="text-[11px] text-warm-400 mt-1">
-                Variables: {"{{firstName}}"}, {"{{businessName}}"},{" "}
-                {"{{link}}"}
-              </p>
-            </div>
+          <div className="flex h-[calc(100%-theme(spacing.24))]">
+            {/* Left column: Editor form */}
+            <div className={`flex-1 overflow-y-auto px-6 pb-24 ${showPreview ? "hidden sm:block" : ""}`}>
+              <div className="space-y-5">
+                {/* Name */}
+                <div>
+                  <label className="text-xs font-medium text-warm-700 mb-1.5 block">
+                    Template Name
+                  </label>
+                  <Input
+                    value={editor.name}
+                    onChange={(e) =>
+                      setEditor({ ...editor, name: e.target.value })
+                    }
+                    placeholder="e.g. Standard Cleaning"
+                    className="text-sm"
+                  />
+                </div>
 
-            {/* Page Heading */}
-            <div>
-              <label className="text-xs font-medium text-warm-700 mb-1.5 block">
-                Page Heading
-              </label>
-              <Input
-                value={editor.pageHeading}
-                onChange={(e) =>
-                  setEditor({ ...editor, pageHeading: e.target.value })
-                }
-                placeholder="Thanks for visiting, {{firstName}}!"
-                className="text-sm"
-              />
-            </div>
-
-            {/* Page Subheading */}
-            <div>
-              <label className="text-xs font-medium text-warm-700 mb-1.5 block">
-                Page Subheading{" "}
-                <span className="text-warm-400 font-normal">(optional)</span>
-              </label>
-              <Input
-                value={editor.pageSubheading}
-                onChange={(e) =>
-                  setEditor({ ...editor, pageSubheading: e.target.value })
-                }
-                placeholder="Please review these instructions carefully"
-                className="text-sm"
-              />
-            </div>
-
-            {/* Sections */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-warm-700">
-                  Sections
-                </label>
-                <button
-                  onClick={addSection}
-                  className="text-xs text-teal-600 hover:text-teal-700 font-medium"
-                >
-                  + Add section
-                </button>
-              </div>
-              <div className="space-y-3">
-                <AnimatePresence mode="popLayout">
-                  {editor.sections.map((section, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <SectionEditor
-                        section={section}
-                        index={idx}
-                        onChange={updateSection}
-                        onRemove={removeSection}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {editor.sections.length === 0 && (
-                  <p className="text-xs text-warm-400 text-center py-4 border border-dashed border-warm-200 rounded-lg">
-                    No sections yet. Add one above.
+                {/* SMS Message */}
+                <div>
+                  <label className="text-xs font-medium text-warm-700 mb-1.5 block">
+                    SMS Message
+                  </label>
+                  <Textarea
+                    value={editor.smsMessage}
+                    onChange={(e) =>
+                      setEditor({ ...editor, smsMessage: e.target.value })
+                    }
+                    placeholder="Hi {{firstName}}! ..."
+                    className="text-sm min-h-[80px]"
+                  />
+                  <p className="text-[11px] text-warm-400 mt-1">
+                    Variables: {"{{firstName}}"}, {"{{businessName}}"},{" "}
+                    {"{{link}}"}
                   </p>
-                )}
+                </div>
+
+                {/* Page Heading */}
+                <div>
+                  <label className="text-xs font-medium text-warm-700 mb-1.5 block">
+                    Page Heading
+                  </label>
+                  <Input
+                    value={editor.pageHeading}
+                    onChange={(e) =>
+                      setEditor({ ...editor, pageHeading: e.target.value })
+                    }
+                    placeholder="Thanks for visiting, {{firstName}}!"
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Page Subheading */}
+                <div>
+                  <label className="text-xs font-medium text-warm-700 mb-1.5 block">
+                    Page Subheading{" "}
+                    <span className="text-warm-400 font-normal">(optional)</span>
+                  </label>
+                  <Input
+                    value={editor.pageSubheading}
+                    onChange={(e) =>
+                      setEditor({ ...editor, pageSubheading: e.target.value })
+                    }
+                    placeholder="Please review these instructions carefully"
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Sections */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-warm-700">
+                      Sections
+                    </label>
+                    <button
+                      onClick={addSection}
+                      className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    >
+                      + Add section
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <AnimatePresence mode="popLayout">
+                      {editor.sections.map((section, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <SectionEditor
+                            section={section}
+                            index={idx}
+                            onChange={updateSection}
+                            onRemove={removeSection}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                    {editor.sections.length === 0 && (
+                      <p className="text-xs text-warm-400 text-center py-4 border border-dashed border-warm-200 rounded-lg">
+                        No sections yet. Add one above.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Toggles */}
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-warm-700">
+                      Show Google Review CTA
+                    </label>
+                    <Switch
+                      checked={editor.showReviewCta}
+                      onCheckedChange={(val) =>
+                        setEditor({ ...editor, showReviewCta: val })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-warm-700">
+                      Show Booking CTA
+                    </label>
+                    <Switch
+                      checked={editor.showBookingCta}
+                      onCheckedChange={(val) =>
+                        setEditor({ ...editor, showBookingCta: val })
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Toggles */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-warm-700">
-                  Show Google Review CTA
-                </label>
-                <Switch
-                  checked={editor.showReviewCta}
-                  onCheckedChange={(val) =>
-                    setEditor({ ...editor, showReviewCta: val })
-                  }
+            {/* Right column: Live Preview */}
+            <div className={`w-[320px] border-l border-warm-100 bg-warm-50/50 flex-shrink-0 flex flex-col items-center py-4 overflow-y-auto ${showPreview ? "" : "hidden sm:flex"}`}>
+              <p className="text-xs font-medium text-warm-400 mb-3 uppercase tracking-wider">Live Preview</p>
+              <PhoneFrame>
+                <FollowUpPreview
+                  pageHeading={editor.pageHeading}
+                  pageSubheading={editor.pageSubheading}
+                  sections={editor.sections}
+                  showReviewCta={editor.showReviewCta}
+                  showBookingCta={editor.showBookingCta}
+                  businessName={businessName}
+                  brandPrimaryColor={brandPrimaryColor}
                 />
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-warm-700">
-                  Show Booking CTA
-                </label>
-                <Switch
-                  checked={editor.showBookingCta}
-                  onCheckedChange={(val) =>
-                    setEditor({ ...editor, showBookingCta: val })
-                  }
-                />
-              </div>
+              </PhoneFrame>
             </div>
           </div>
 
