@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                  String     @id @default(cuid())
+  name                String
+  type                String     // "dentist", "vet", "mechanic", "salon", etc.
+  email               String     @unique
+  phone               String?
+  logoUrl             String?
+  brandPrimaryColor   String     @default("#0D9488")
+  brandSecondaryColor String     @default("#0F766E")
+  googlePlaceId       String?
+  googleReviewUrl     String?
+  websiteUrl          String?
+  bookingUrl          String?
+  plan                String     @default("trial") // "trial", "starter", "growth", "pro"
+  stripeCustomerId    String?
+  stripeSubId         String?
+  trialEndsAt         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Auto-branding metadata (populated during onboarding)
+  autoBrandFetched    Boolean    @default(false)
+  autoBrandData       Json?      // Raw extracted data from website for reference
+
+  locations    Location[]
+  templates    Template[]
+  followUps    FollowUp[]
+  snippets     Snippet[]
+  users        User[]
+  optOuts      OptOut[]
+  contacts     Contact[]
+  importJobs   ImportJob[]
+  integrations Integration[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+model Location {
+  id         String     @id @default(cuid())
+  name       String     // "Main Office", "Downtown Branch"
+  address    String?
+  phone      String?    // Twilio number assigned to this location
+  businessId String
+  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  followUps  FollowUp[]
+  createdAt  DateTime   @default(now())
+
+  @@index([businessId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("staff") // "owner", "admin", "staff"
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([businessId])
+  @@index([email])
+}
+
+model Contact {
+  id             String     @id @default(cuid())
+  firstName      String
+  lastName       String?
+  phone          String
+  email          String?
+  tags           String[]   // ["vip", "new-patient", "recurring"]
+  source         String     @default("manual") // "manual", "csv_import", "google_contacts", "zapier", "auto_saved"
+  totalFollowUps Int        @default(0)
+  lastFollowUpAt DateTime?
+  hasLeftReview  Boolean    @default(false)
+  reviewLeftAt   DateTime?
+  notes          String?    // Internal notes about this contact
+  optedOut       Boolean    @default(false)
+  optedOutAt     DateTime?
+  businessId     String
+  business       Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  followUps      FollowUp[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([phone, businessId]) // Prevent duplicate contacts per business
+  @@index([businessId, firstName])
+  @@index([businessId, lastName])
+}
+
+model ImportJob {
+  id            String    @id @default(cuid())
+  source        String    // "csv", "google_contacts", "zapier"
+  status        String    @default("pending") // "pending", "processing", "completed", "failed"
+  fileName      String?   // Original CSV filename
+  totalRows     Int       @default(0)
+  importedCount Int       @default(0)
+  skippedCount  Int       @default(0)
+  errorCount    Int       @default(0)
+  errorDetails  Json?     // Array of { row, reason } for failed rows
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([businessId])
+}
+
+model Integration {
+  id           String    @id @default(cuid())
+  type         String    // "google_contacts", "zapier", "dentrix", "square"
+  status       String    @default("disconnected") // "connected", "disconnected", "error"
+  accessToken  String?   // Encrypted OAuth token
+  refreshToken String?   // Encrypted refresh token
+  expiresAt    DateTime?
+  lastSyncAt   DateTime?
+  config       Json?     // Integration-specific settings
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([type, businessId]) // One integration per type per business
+}
+
+model Template {
+  id               String     @id @default(cuid())
+  name             String
+  smsMessage       String
+  pageHeading      String
+  pageSubheading   String?
+  sections         Json
+  showReviewCta    Boolean    @default(true)
+  showBookingCta   Boolean    @default(true)
+  isDefault        Boolean    @default(false)
+  isSystemTemplate Boolean    @default(false)
+  businessId       String?
+  business         Business?  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  followUps        FollowUp[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([businessId])
+  @@index([isSystemTemplate])
+}
+
+model FollowUp {
+  id               String    @id @default(cuid())
+  clientFirstName  String
+  clientPhone      String
+  customNotes      String?
+  smsStatus        String    @default("pending") // "pending", "sent", "delivered", "failed"
+  smsSid           String?
+  pageViewedAt     DateTime?
+  reviewClickedAt  DateTime?
+  bookingClickedAt DateTime?
+  templateId       String
+  template         Template  @relation(fields: [templateId], references: [id])
+  businessId       String
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  locationId       String?
+  location         Location? @relation(fields: [locationId], references: [id])
+  contactId        String?
+  contact          Contact?  @relation(fields: [contactId], references: [id])
+  createdAt        DateTime  @default(now())
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@index([smsStatus])
+  @@index([contactId])
+}
+
+model Snippet {
+  id         String   @id @default(cuid())
+  label      String
+  text       String
+  category   String?
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+}
+
+model OptOut {
+  id         String   @id @default(cuid())
+  phone      String   // E.164 format
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([phone, businessId])
+  @@index([phone])
+  @@index([businessId])
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
