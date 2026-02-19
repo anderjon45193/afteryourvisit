@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 import {
   validateTwilioSignature,
   normalizePhone,
@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
-  // Determine if this is an inbound SMS (has Body + From) or a delivery status callback
   const messageBody = params.Body;
   const from = params.From;
   const messageSid = params.MessageSid;
@@ -40,22 +39,38 @@ export async function POST(request: NextRequest) {
     console.log(`[Twilio Webhook] Inbound SMS from ${normalizedPhone}: "${keyword}"`);
 
     if (OPT_OUT_KEYWORDS.includes(keyword)) {
-      // Opt out from ALL businesses that have sent to this phone
-      const bizIds = mockDb.getBusinessIdsForPhone(normalizedPhone);
-      for (const bizId of bizIds) {
-        mockDb.addOptOut(normalizedPhone, bizId);
+      const followUps = await prisma.followUp.findMany({
+        where: { clientPhone: normalizedPhone },
+        select: { businessId: true },
+        distinct: ["businessId"],
+      });
+
+      for (const { businessId } of followUps) {
+        await prisma.optOut.upsert({
+          where: { phone_businessId: { phone: normalizedPhone, businessId } },
+          update: {},
+          create: { phone: normalizedPhone, businessId },
+        });
       }
+
       console.log(
-        `[Twilio Webhook] STOP processed — opted out of ${bizIds.length} business(es)`
+        `[Twilio Webhook] STOP processed — opted out of ${followUps.length} business(es)`
       );
     } else if (OPT_IN_KEYWORDS.includes(keyword)) {
-      // Opt back in to ALL businesses
-      const bizIds = mockDb.getBusinessIdsForPhone(normalizedPhone);
-      for (const bizId of bizIds) {
-        mockDb.removeOptOut(normalizedPhone, bizId);
+      const followUps = await prisma.followUp.findMany({
+        where: { clientPhone: normalizedPhone },
+        select: { businessId: true },
+        distinct: ["businessId"],
+      });
+
+      for (const { businessId } of followUps) {
+        await prisma.optOut.deleteMany({
+          where: { phone: normalizedPhone, businessId },
+        });
       }
+
       console.log(
-        `[Twilio Webhook] START processed — opted back in to ${bizIds.length} business(es)`
+        `[Twilio Webhook] START processed — opted back in to ${followUps.length} business(es)`
       );
     }
 
@@ -66,16 +81,20 @@ export async function POST(request: NextRequest) {
   if (messageSid && messageStatus) {
     console.log(`[Twilio Webhook] Delivery status — SID: ${messageSid}, Status: ${messageStatus}`);
 
-    const followUp = mockDb.followUps.find((f) => f.smsSid === messageSid);
-    if (followUp) {
-      const statusMap: Record<string, string> = {
-        queued: "pending",
-        sent: "sent",
-        delivered: "delivered",
-        undelivered: "failed",
-        failed: "failed",
-      };
-      followUp.smsStatus = statusMap[messageStatus] || followUp.smsStatus;
+    const statusMap: Record<string, string> = {
+      queued: "pending",
+      sent: "sent",
+      delivered: "delivered",
+      undelivered: "failed",
+      failed: "failed",
+    };
+
+    const mappedStatus = statusMap[messageStatus];
+    if (mappedStatus) {
+      await prisma.followUp.updateMany({
+        where: { smsSid: messageSid },
+        data: { smsStatus: mappedStatus },
+      });
     }
   }
 

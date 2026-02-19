@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // GET /api/followups/:id — Get follow-up details
 export async function GET(
@@ -11,24 +11,27 @@ export async function GET(
   if (error) return error;
 
   const { id } = await params;
-  const followUp = mockDb.getFollowUp(id);
+  const followUp = await prisma.followUp.findUnique({
+    where: { id },
+    include: {
+      template: true,
+      business: true,
+    },
+  });
 
-  if (!followUp || followUp.businessId !== business.id) {
+  if (!followUp || followUp.businessId !== business!.id) {
     return NextResponse.json({ error: "Follow-up not found" }, { status: 404 });
   }
 
-  const template = mockDb.getTemplate(followUp.templateId);
-
   return NextResponse.json({
     ...followUp,
-    templateName: template?.name || "Unknown",
-    template,
+    templateName: followUp.template.name,
     business: {
-      name: business.name,
-      logoUrl: business.logoUrl,
-      brandPrimaryColor: business.brandPrimaryColor,
-      googleReviewUrl: business.googleReviewUrl,
-      bookingUrl: business.bookingUrl,
+      name: followUp.business.name,
+      logoUrl: followUp.business.logoUrl,
+      brandPrimaryColor: followUp.business.brandPrimaryColor,
+      googleReviewUrl: followUp.business.googleReviewUrl,
+      bookingUrl: followUp.business.bookingUrl,
     },
     status: followUp.reviewClickedAt
       ? "reviewed"

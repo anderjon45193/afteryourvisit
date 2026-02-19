@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { stripe, getPlanByPriceId } from "@/lib/stripe";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // POST /api/webhooks/stripe — Handle Stripe subscription events
 export async function POST(request: Request) {
@@ -37,13 +37,19 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const businessId = session.metadata?.businessId;
+        const planId = session.metadata?.planId;
+        const stripeCustomerId = session.customer as string;
+        const stripeSubId = session.subscription as string;
+
         if (businessId) {
-          const business = mockDb.getBusiness(businessId);
-          if (business) {
-            business.stripeCustomerId = session.customer;
-            business.stripeSubId = session.subscription;
-            // Plan will be set by subscription.created event
-          }
+          await prisma.business.update({
+            where: { id: businessId },
+            data: {
+              stripeCustomerId,
+              stripeSubId,
+              ...(planId ? { plan: planId } : {}),
+            },
+          });
         }
         break;
       }
@@ -55,13 +61,17 @@ export async function POST(request: Request) {
         const priceId = subscription.items?.data?.[0]?.price?.id;
 
         if (businessId && priceId) {
-          const business = mockDb.getBusiness(businessId);
           const planInfo = getPlanByPriceId(priceId);
 
-          if (business && planInfo) {
-            business.plan = planInfo.planId;
-            business.stripeSubId = subscription.id;
-            business.trialEndsAt = null; // No longer on trial
+          if (planInfo) {
+            await prisma.business.update({
+              where: { id: businessId },
+              data: {
+                plan: planInfo.planId,
+                stripeSubId: subscription.id,
+                trialEndsAt: null,
+              },
+            });
             console.log(`[Stripe] Business ${businessId} → ${planInfo.planId} (${planInfo.interval})`);
           }
         }
@@ -73,12 +83,14 @@ export async function POST(request: Request) {
         const businessId = subscription.metadata?.businessId;
 
         if (businessId) {
-          const business = mockDb.getBusiness(businessId);
-          if (business) {
-            business.plan = "starter"; // Downgrade to starter
-            business.stripeSubId = null;
-            console.log(`[Stripe] Business ${businessId} subscription cancelled, downgraded to starter`);
-          }
+          await prisma.business.update({
+            where: { id: businessId },
+            data: {
+              plan: "starter",
+              stripeSubId: null,
+            },
+          });
+          console.log(`[Stripe] Business ${businessId} subscription cancelled, downgraded to starter`);
         }
         break;
       }
@@ -86,7 +98,6 @@ export async function POST(request: Request) {
       case "invoice.payment_failed": {
         const invoice = event.data.object;
         console.log(`[Stripe] Payment failed for customer ${invoice.customer}`);
-        // In production: send email notification to business owner
         break;
       }
 

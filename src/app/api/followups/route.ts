@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 import { sendFollowUpSMS, normalizePhone } from "@/lib/twilio";
+import { Prisma } from "@prisma/client";
 
 // GET /api/followups — List follow-ups (paginated, filterable)
 export async function GET(request: NextRequest) {
@@ -13,37 +14,39 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "20");
   const search = searchParams.get("search") || "";
   const status = searchParams.get("status") || "";
+  const skip = (page - 1) * limit;
 
-  let followUps = mockDb.getFollowUps(business.id);
+  const where: Prisma.FollowUpWhereInput = {
+    businessId: business!.id,
+  };
 
-  // Filter by search
   if (search) {
-    const q = search.toLowerCase();
-    followUps = followUps.filter(
-      (f) =>
-        f.clientFirstName.toLowerCase().includes(q) ||
-        f.clientPhone.includes(q)
-    );
+    where.OR = [
+      { clientFirstName: { contains: search, mode: "insensitive" } },
+      { clientPhone: { contains: search } },
+    ];
   }
 
-  // Filter by status
   if (status) {
-    followUps = followUps.filter((f) => f.smsStatus === status);
+    where.smsStatus = status;
   }
 
-  const total = followUps.length;
-  const offset = (page - 1) * limit;
-  const paginated = followUps.slice(offset, offset + limit);
+  const [followUps, total] = await Promise.all([
+    prisma.followUp.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: { template: { select: { name: true } } },
+    }),
+    prisma.followUp.count({ where }),
+  ]);
 
-  // Enrich with template name
-  const enriched = paginated.map((f) => {
-    const template = mockDb.getTemplate(f.templateId);
-    return {
-      ...f,
-      templateName: template?.name || "Unknown",
-      status: f.reviewClickedAt ? "reviewed" : f.pageViewedAt ? "opened" : "sent",
-    };
-  });
+  const enriched = followUps.map((f) => ({
+    ...f,
+    templateName: f.template.name,
+    status: f.reviewClickedAt ? "reviewed" : f.pageViewedAt ? "opened" : "sent",
+  }));
 
   return NextResponse.json({
     data: enriched,
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
   }
 
   // Validate template exists
-  const template = mockDb.getTemplate(templateId);
+  const template = await prisma.template.findUnique({ where: { id: templateId } });
   if (!template) {
     return NextResponse.json({ error: "Template not found" }, { status: 400 });
   }
@@ -85,82 +88,78 @@ export async function POST(request: Request) {
 
   // Check opt-out status
   const normalized = normalizePhone(clientPhone);
-  if (mockDb.isOptedOut(normalized, business.id)) {
+  const optOut = await prisma.optOut.findUnique({
+    where: { phone_businessId: { phone: normalized, businessId: business!.id } },
+  });
+  if (optOut) {
     return NextResponse.json(
       { error: "This phone number has opted out of messages from your business." },
       { status: 422 }
     );
   }
 
-  // Create follow-up record
-  const followUp = {
-    id: `fu-${mockDb.generateId()}`,
-    clientFirstName,
-    clientPhone,
-    customNotes: customNotes || null,
-    smsStatus: "pending",
-    smsSid: null as string | null,
-    pageViewedAt: null,
-    reviewClickedAt: null,
-    bookingClickedAt: null,
-    templateId,
-    businessId: business.id,
-    locationId: locationId || null,
-    contactId: null as string | null,
-    createdAt: new Date().toISOString(),
-  };
-
-  mockDb.followUps.unshift(followUp);
-
   // Auto-save/link contact
-  let contact = mockDb.findContactByPhone(clientPhone, business.id);
-  if (!contact) {
-    contact = {
-      id: `ct-${mockDb.generateId()}`,
+  const contact = await prisma.contact.upsert({
+    where: {
+      phone_businessId: { phone: normalized, businessId: business!.id },
+    },
+    create: {
       firstName: clientFirstName,
-      lastName: null,
-      phone: clientPhone,
-      email: null,
-      tags: [],
+      phone: normalized,
       source: "auto_saved",
       totalFollowUps: 1,
-      lastFollowUpAt: followUp.createdAt,
-      hasLeftReview: false,
-      notes: null,
-      optedOut: false,
-      businessId: business.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    mockDb.contacts.push(contact);
-  } else {
-    contact.totalFollowUps++;
-    contact.lastFollowUpAt = followUp.createdAt;
-    contact.updatedAt = new Date().toISOString();
-  }
-  followUp.contactId = contact.id;
+      lastFollowUpAt: new Date(),
+      businessId: business!.id,
+    },
+    update: {
+      totalFollowUps: { increment: 1 },
+      lastFollowUpAt: new Date(),
+    },
+  });
+
+  // Create follow-up record
+  const followUp = await prisma.followUp.create({
+    data: {
+      clientFirstName,
+      clientPhone: normalized,
+      customNotes: customNotes || null,
+      smsStatus: "pending",
+      templateId,
+      businessId: business!.id,
+      locationId: locationId || null,
+      contactId: contact.id,
+    },
+  });
 
   // Send SMS via Twilio (or dev mode mock)
+  let smsStatus = "pending";
+  let smsSid: string | null = null;
   try {
     const sid = await sendFollowUpSMS({
       to: clientPhone,
       firstName: clientFirstName,
-      businessName: business.name,
+      businessName: business!.name,
       followUpId: followUp.id,
       smsTemplate: template.smsMessage,
     });
-    followUp.smsSid = sid;
-    followUp.smsStatus = "sent";
+    smsSid = sid;
+    smsStatus = "sent";
   } catch (err) {
     console.error(`[SMS] Failed to send follow-up ${followUp.id}:`, err);
-    followUp.smsStatus = "failed";
+    smsStatus = "failed";
   }
+
+  // Update the follow-up with SMS result
+  const updatedFollowUp = await prisma.followUp.update({
+    where: { id: followUp.id },
+    data: { smsStatus, smsSid },
+  });
 
   return NextResponse.json(
     {
-      ...followUp,
+      ...updatedFollowUp,
       templateName: template.name,
-      followUpUrl: `/v/${followUp.id}`,
+      followUpUrl: `/v/${updatedFollowUp.id}`,
     },
     { status: 201 }
   );

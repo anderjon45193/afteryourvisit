@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // POST /api/v/:id/viewed — Track page view (public, no auth)
 export async function POST(
@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const followUp = mockDb.getFollowUp(id);
+  const followUp = await prisma.followUp.findUnique({ where: { id } });
 
   if (!followUp) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -15,7 +15,10 @@ export async function POST(
 
   // Only record first view
   if (!followUp.pageViewedAt) {
-    followUp.pageViewedAt = new Date().toISOString();
+    await prisma.followUp.update({
+      where: { id },
+      data: { pageViewedAt: new Date() },
+    });
     console.log(`[Track] Page viewed: ${id} by ${followUp.clientFirstName}`);
   }
 

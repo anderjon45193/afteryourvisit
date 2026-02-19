@@ -1,6 +1,6 @@
 import { Star, Calendar, ClipboardList, ExternalLink, ArrowRight } from "lucide-react";
-import { mockDb } from "@/lib/mock-data";
-import type { Section } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
+import type { Section } from "@/lib/types";
 import { notFound } from "next/navigation";
 import { TrackingPixel, TrackingLink } from "./tracking";
 
@@ -11,21 +11,21 @@ export default async function FollowUpPage({
 }) {
   const { id } = await params;
 
-  // Load from data store
-  const followUp = mockDb.getFollowUp(id);
+  // Load from database
+  const followUp = await prisma.followUp.findUnique({
+    where: { id },
+    include: {
+      business: true,
+      template: true,
+    },
+  });
+
   if (!followUp) {
     notFound();
   }
 
-  const business = mockDb.getBusiness(followUp.businessId);
-  if (!business) {
-    notFound();
-  }
-
-  const template = mockDb.getTemplate(followUp.templateId);
-  if (!template) {
-    notFound();
-  }
+  const business = followUp.business;
+  const template = followUp.template;
 
   const heading = template.pageHeading.replace(
     "{{firstName}}",
@@ -40,10 +40,12 @@ export default async function FollowUpPage({
 
   const initials = business.name
     .split(" ")
-    .map((w) => w[0])
+    .map((w: string) => w[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const sections = template.sections as unknown as Section[];
 
   return (
     <div className="min-h-screen bg-warm-50">
@@ -79,7 +81,7 @@ export default async function FollowUpPage({
 
         {/* Sections */}
         <div className="space-y-5">
-          {template.sections.map((section: Section, i: number) => {
+          {sections.map((section: Section, i: number) => {
             if (section.type === "notes" && followUp.customNotes) {
               return (
                 <div
@@ -221,4 +223,3 @@ export default async function FollowUpPage({
     </div>
   );
 }
-

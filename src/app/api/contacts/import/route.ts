@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // POST /api/contacts/import — Import contacts from CSV
 export async function POST(request: Request) {
@@ -17,56 +17,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const importJob: {
-    id: string;
+  let importedCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+  const errorDetails: string[] = [];
+
+  // Pre-fetch existing phones for this business
+  const existingContacts = await prisma.contact.findMany({
+    where: { businessId: business!.id },
+    select: { phone: true },
+  });
+  const existingPhones = new Set(existingContacts.map((c) => c.phone));
+  const batchPhones = new Set<string>();
+
+  const contactsToCreate: {
+    firstName: string;
+    lastName: string | null;
+    phone: string;
+    email: string | null;
+    tags: string[];
     source: string;
-    status: "processing" | "completed" | "failed";
-    fileName: string;
-    totalRows: number;
-    importedCount: number;
-    skippedCount: number;
-    errorCount: number;
-    errorDetails: string[];
     businessId: string;
-    createdAt: string;
-    completedAt: string | null;
-  } = {
-    id: `imp-${mockDb.generateId()}`,
-    source: "csv",
-    status: "processing",
-    fileName: fileName || "import.csv",
-    totalRows: rows.length,
-    importedCount: 0,
-    skippedCount: 0,
-    errorCount: 0,
-    errorDetails: [],
-    businessId: business.id,
-    createdAt: new Date().toISOString(),
-    completedAt: null,
-  };
+  }[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const { firstName, lastName, phone, email, tags } = row;
 
     if (!firstName || !phone) {
-      importJob.errorCount++;
-      importJob.errorDetails.push(`Row ${i + 1}: Missing firstName or phone`);
+      errorCount++;
+      errorDetails.push(`Row ${i + 1}: Missing firstName or phone`);
       continue;
     }
 
-    // Normalize phone - strip non-digits
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10) {
-      importJob.errorCount++;
-      importJob.errorDetails.push(`Row ${i + 1}: Invalid phone number`);
-      continue;
-    }
-
-    // Check duplicate
-    const existing = mockDb.findContactByPhone(phone, business.id);
-    if (existing) {
-      importJob.skippedCount++;
+      errorCount++;
+      errorDetails.push(`Row ${i + 1}: Invalid phone number`);
       continue;
     }
 
@@ -75,36 +62,61 @@ export async function POST(request: Request) {
         ? `(${digits.slice(-10, -7)}) ${digits.slice(-7, -4)}-${digits.slice(-4)}`
         : phone;
 
-    const contact = {
-      id: `ct-${mockDb.generateId()}`,
+    if (existingPhones.has(formattedPhone)) {
+      skippedCount++;
+      continue;
+    }
+
+    if (batchPhones.has(formattedPhone)) {
+      skippedCount++;
+      continue;
+    }
+
+    batchPhones.add(formattedPhone);
+
+    const parsedTags = tags
+      ? Array.isArray(tags) ? tags : [tags]
+      : [];
+
+    contactsToCreate.push({
       firstName,
       lastName: lastName || null,
       phone: formattedPhone,
       email: email || null,
-      tags: tags ? (Array.isArray(tags) ? tags : [tags]) : [],
-      source: "csv_import" as const,
-      totalFollowUps: 0,
-      lastFollowUpAt: null,
-      hasLeftReview: false,
-      notes: null,
-      optedOut: false,
-      businessId: business.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    mockDb.contacts.push(contact);
-    importJob.importedCount++;
+      tags: parsedTags,
+      source: "csv_import",
+      businessId: business!.id,
+    });
   }
 
-  importJob.status = "completed";
-  importJob.completedAt = new Date().toISOString();
-  mockDb.importJobs.push(importJob);
+  if (contactsToCreate.length > 0) {
+    const result = await prisma.contact.createMany({
+      data: contactsToCreate,
+      skipDuplicates: true,
+    });
+    importedCount = result.count;
+  }
+
+  // Record the import job
+  await prisma.importJob.create({
+    data: {
+      source: "csv",
+      status: "completed",
+      fileName: fileName || "import.csv",
+      totalRows: rows.length,
+      importedCount,
+      skippedCount,
+      errorCount,
+      errorDetails: errorDetails,
+      businessId: business!.id,
+      completedAt: new Date(),
+    },
+  });
 
   return NextResponse.json({
-    importedCount: importJob.importedCount,
-    skippedCount: importJob.skippedCount,
-    errorCount: importJob.errorCount,
-    errorDetails: importJob.errorDetails,
+    importedCount,
+    skippedCount,
+    errorCount,
+    errorDetails,
   });
 }

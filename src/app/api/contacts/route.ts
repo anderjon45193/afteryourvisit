@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 // GET /api/contacts — List contacts (paginated, filterable)
 export async function GET(request: NextRequest) {
@@ -15,44 +16,46 @@ export async function GET(request: NextRequest) {
   const sort = searchParams.get("sort") || "createdAt";
   const sortDir = searchParams.get("sortDir") || "desc";
 
-  let contactsList = mockDb.getContacts(business.id);
+  const where: Prisma.ContactWhereInput = {
+    businessId: business!.id,
+  };
 
-  // Search
   if (search) {
-    const q = search.toLowerCase();
-    contactsList = contactsList.filter(
-      (c) =>
-        c.firstName.toLowerCase().includes(q) ||
-        (c.lastName || "").toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        (c.email || "").toLowerCase().includes(q)
-    );
+    where.OR = [
+      { firstName: { contains: search, mode: "insensitive" } },
+      { lastName: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } },
+      { email: { contains: search, mode: "insensitive" } },
+    ];
   }
 
-  // Filter
   if (filter === "has_review") {
-    contactsList = contactsList.filter((c) => c.hasLeftReview);
+    where.hasLeftReview = true;
   } else if (filter === "no_review") {
-    contactsList = contactsList.filter((c) => !c.hasLeftReview);
+    where.hasLeftReview = false;
   } else if (filter === "opted_out") {
-    contactsList = contactsList.filter((c) => c.optedOut);
+    where.optedOut = true;
   }
 
-  // Sort
-  contactsList.sort((a, b) => {
-    const aVal = a[sort as keyof typeof a];
-    const bVal = b[sort as keyof typeof b];
-    const aStr = String(aVal || "");
-    const bStr = String(bVal || "");
-    return sortDir === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
-  });
+  const allowedSortFields = [
+    "firstName", "lastName", "phone", "email", "createdAt", "updatedAt",
+    "totalFollowUps", "lastFollowUpAt", "hasLeftReview",
+  ];
+  const sortField = allowedSortFields.includes(sort) ? sort : "createdAt";
+  const sortDirection = sortDir === "asc" ? "asc" : "desc";
 
-  const total = contactsList.length;
-  const offset = (page - 1) * limit;
-  const paginated = contactsList.slice(offset, offset + limit);
+  const [contactsList, total] = await Promise.all([
+    prisma.contact.findMany({
+      where,
+      orderBy: { [sortField]: sortDirection },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.contact.count({ where }),
+  ]);
 
   return NextResponse.json({
-    data: paginated,
+    data: contactsList,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }
@@ -72,8 +75,12 @@ export async function POST(request: Request) {
     );
   }
 
-  // Check duplicate
-  const existing = mockDb.findContactByPhone(phone, business.id);
+  // Check duplicate by phone + businessId (unique constraint)
+  const existing = await prisma.contact.findUnique({
+    where: {
+      phone_businessId: { phone, businessId: business!.id },
+    },
+  });
   if (existing) {
     return NextResponse.json(
       { error: "A contact with this phone number already exists" },
@@ -81,25 +88,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const contact = {
-    id: `ct-${mockDb.generateId()}`,
-    firstName,
-    lastName: lastName || null,
-    phone,
-    email: email || null,
-    tags: tags || [],
-    source: "manual" as const,
-    totalFollowUps: 0,
-    lastFollowUpAt: null,
-    hasLeftReview: false,
-    notes: notes || null,
-    optedOut: false,
-    businessId: business.id,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  mockDb.contacts.push(contact);
+  const contact = await prisma.contact.create({
+    data: {
+      firstName,
+      lastName: lastName || null,
+      phone,
+      email: email || null,
+      tags: tags || [],
+      source: "manual",
+      notes: notes || null,
+      businessId: business!.id,
+    },
+  });
 
   return NextResponse.json(contact, { status: 201 });
 }

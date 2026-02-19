@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
-// GET /api/snippets — List snippets
+// GET /api/snippets — List snippets for this business
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return error;
 
-  const snippets = mockDb.getSnippets(business.id);
+  const snippets = await prisma.snippet.findMany({
+    where: { businessId: business!.id },
+    orderBy: { createdAt: "desc" },
+  });
+
   return NextResponse.json(snippets);
 }
 
@@ -22,15 +26,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "label is required" }, { status: 400 });
   }
 
-  const snippet = {
-    id: `snp-${mockDb.generateId()}`,
-    label,
-    text: text || label,
-    category: category || "general",
-    businessId: business.id,
-    createdAt: new Date().toISOString(),
-  };
+  const snippet = await prisma.snippet.create({
+    data: {
+      label,
+      text: text || label,
+      category: category || "general",
+      businessId: business!.id,
+    },
+  });
 
-  mockDb.snippets.push(snippet);
   return NextResponse.json(snippet, { status: 201 });
 }

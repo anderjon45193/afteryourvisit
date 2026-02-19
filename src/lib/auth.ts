@@ -2,20 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
 import bcrypt from "bcryptjs";
-
-// In production, this would use Prisma to look up users.
-// For development without a DB, we use a demo user.
-const DEMO_USER = {
-  id: "demo-user-1",
-  email: "dr.patel@smiledentalcare.com",
-  name: "Dr. Patel",
-  role: "owner",
-  businessId: "demo-biz-1",
-  businessName: "Smile Dental Care",
-  businessType: "dentist",
-  // password: "demo1234"
-  passwordHash: "$2b$10$GdRiNk2AanhiM1OOX1B1deetB9jhCx46CmFh7Mv7D6gQ.C4Q4Fp0W",
-};
+import { prisma } from "@/lib/db";
 
 export const authConfig: NextAuthConfig = {
   pages: {
@@ -35,20 +22,23 @@ export const authConfig: NextAuthConfig = {
 
         if (!email || !password) return null;
 
-        // In production: const user = await prisma.user.findUnique({ where: { email } });
-        // For development, check against demo user
-        if (email !== DEMO_USER.email) return null;
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: { business: true },
+        });
 
-        const passwordMatch = await bcrypt.compare(password, DEMO_USER.passwordHash);
+        if (!user) return null;
+
+        const passwordMatch = await bcrypt.compare(password, user.passwordHash);
         if (!passwordMatch) return null;
 
         return {
-          id: DEMO_USER.id,
-          email: DEMO_USER.email,
-          name: DEMO_USER.name,
-          role: DEMO_USER.role,
-          businessId: DEMO_USER.businessId,
-          businessName: DEMO_USER.businessName,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          businessId: user.businessId,
+          businessName: user.business.name,
         };
       },
     }),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // PUT /api/templates/:id — Update template
 export async function PUT(
@@ -11,25 +11,34 @@ export async function PUT(
   if (error) return error;
 
   const { id } = await params;
-  const template = mockDb.getTemplate(id);
 
-  if (!template || (template.businessId !== business.id && !template.isSystemTemplate)) {
+  const template = await prisma.template.findFirst({
+    where: {
+      id,
+      OR: [{ businessId: business!.id }, { isSystemTemplate: true }],
+    },
+  });
+
+  if (!template) {
     return NextResponse.json({ error: "Template not found" }, { status: 404 });
   }
 
   const updates = await request.json();
   const allowed = ["name", "smsMessage", "pageHeading", "pageSubheading", "sections", "showReviewCta", "showBookingCta", "isDefault"];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tpl = template as any;
+  const data: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in updates) {
-      tpl[key] = updates[key];
+      data[key] = updates[key];
     }
   }
-  template.updatedAt = new Date().toISOString();
 
-  return NextResponse.json(template);
+  const updated = await prisma.template.update({
+    where: { id },
+    data,
+  });
+
+  return NextResponse.json(updated);
 }
 
 // DELETE /api/templates/:id — Delete template
@@ -41,14 +50,20 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
-  const idx = mockDb.templates.findIndex(
-    (t) => t.id === id && t.businessId === business.id && !t.isSystemTemplate
-  );
 
-  if (idx === -1) {
+  const template = await prisma.template.findFirst({
+    where: {
+      id,
+      businessId: business!.id,
+      isSystemTemplate: false,
+    },
+  });
+
+  if (!template) {
     return NextResponse.json({ error: "Template not found or cannot be deleted" }, { status: 404 });
   }
 
-  mockDb.templates.splice(idx, 1);
+  await prisma.template.delete({ where: { id } });
+
   return NextResponse.json({ success: true });
 }

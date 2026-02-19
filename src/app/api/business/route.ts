@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
+import { prisma } from "@/lib/db";
 
 // GET /api/business — Get current business profile
 export async function GET() {
@@ -16,13 +17,17 @@ export async function PUT(request: Request) {
   const updates = await request.json();
   const allowed = ["name", "type", "email", "phone", "websiteUrl", "bookingUrl", "googleReviewUrl"];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const biz = business as any;
+  const data: Record<string, string> = {};
   for (const key of allowed) {
     if (key in updates) {
-      biz[key] = updates[key];
+      data[key] = updates[key];
     }
   }
 
-  return NextResponse.json(business);
+  const updated = await prisma.business.update({
+    where: { id: business!.id },
+    data,
+  });
+
+  return NextResponse.json(updated);
 }

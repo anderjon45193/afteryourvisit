@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
-// GET /api/templates — List all templates (system + custom)
+// GET /api/templates — List all templates (system + custom for this business)
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return error;
 
-  const templates = mockDb.getTemplates(business.id);
+  const templates = await prisma.template.findMany({
+    where: {
+      OR: [{ businessId: business!.id }, { isSystemTemplate: true }],
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   return NextResponse.json(templates);
 }
 
@@ -23,22 +29,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "name, smsMessage, and pageHeading are required" }, { status: 400 });
   }
 
-  const template = {
-    id: `tpl-${mockDb.generateId()}`,
-    name,
-    smsMessage,
-    pageHeading,
-    pageSubheading: pageSubheading || null,
-    sections: sections || [],
-    showReviewCta: showReviewCta ?? true,
-    showBookingCta: showBookingCta ?? true,
-    isDefault: false,
-    isSystemTemplate: false,
-    businessId: business.id,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const template = await prisma.template.create({
+    data: {
+      name,
+      smsMessage,
+      pageHeading,
+      pageSubheading: pageSubheading || null,
+      sections: sections || [],
+      showReviewCta: showReviewCta ?? true,
+      showBookingCta: showBookingCta ?? true,
+      isDefault: false,
+      isSystemTemplate: false,
+      businessId: business!.id,
+    },
+  });
 
-  mockDb.templates.push(template);
   return NextResponse.json(template, { status: 201 });
 }

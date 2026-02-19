@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // POST /api/leads — Capture email from landing page CTA
 export async function POST(request: Request) {
@@ -13,10 +13,18 @@ export async function POST(request: Request) {
   // Basic email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid email format" },
+      { status: 400 }
+    );
   }
 
-  mockDb.addLead(email);
+  // Upsert to handle duplicate emails gracefully
+  await prisma.lead.upsert({
+    where: { email },
+    update: {},
+    create: { email },
+  });
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // POST /api/v/:id/review — Track review click (public, no auth)
 export async function POST(
@@ -7,15 +7,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const followUp = mockDb.getFollowUp(id);
+  const followUp = await prisma.followUp.findUnique({ where: { id } });
 
   if (!followUp) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   if (!followUp.reviewClickedAt) {
-    followUp.reviewClickedAt = new Date().toISOString();
+    await prisma.followUp.update({
+      where: { id },
+      data: { reviewClickedAt: new Date() },
+    });
     console.log(`[Track] Review clicked: ${id} by ${followUp.clientFirstName}`);
+
+    // Also update the linked Contact's hasLeftReview
+    if (followUp.contactId) {
+      await prisma.contact.update({
+        where: { id: followUp.contactId },
+        data: { hasLeftReview: true, reviewLeftAt: new Date() },
+      });
+    }
   }
 
   return NextResponse.json({ success: true });

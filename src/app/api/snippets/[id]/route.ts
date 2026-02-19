@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
-import { mockDb } from "@/lib/mock-data";
+import { prisma } from "@/lib/db";
 
 // DELETE /api/snippets/:id — Delete snippet
 export async function DELETE(
@@ -11,14 +11,19 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
-  const idx = mockDb.snippets.findIndex(
-    (s) => s.id === id && s.businessId === business.id
-  );
 
-  if (idx === -1) {
+  const snippet = await prisma.snippet.findFirst({
+    where: {
+      id,
+      businessId: business!.id,
+    },
+  });
+
+  if (!snippet) {
     return NextResponse.json({ error: "Snippet not found" }, { status: 404 });
   }
 
-  mockDb.snippets.splice(idx, 1);
+  await prisma.snippet.delete({ where: { id } });
+
   return NextResponse.json({ success: true });
 }
