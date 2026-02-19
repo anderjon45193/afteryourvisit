@@ -29,12 +29,18 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  const tag = searchParams.get("tag") || "";
+
   if (filter === "has_review") {
     where.hasLeftReview = true;
   } else if (filter === "no_review") {
     where.hasLeftReview = false;
   } else if (filter === "opted_out") {
     where.optedOut = true;
+  }
+
+  if (tag) {
+    where.tags = { has: tag };
   }
 
   const allowedSortFields = [

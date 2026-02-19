@@ -51,5 +51,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, tagged: contacts.length });
   }
 
+  if (action === "untag" && tag) {
+    const contacts = await prisma.contact.findMany({
+      where: {
+        id: { in: contactIds },
+        businessId: business!.id,
+        tags: { has: tag },
+      },
+      select: { id: true, tags: true },
+    });
+
+    if (contacts.length > 0) {
+      await Promise.all(
+        contacts.map((contact) =>
+          prisma.contact.update({
+            where: { id: contact.id },
+            data: { tags: contact.tags.filter((t) => t !== tag) },
+          })
+        )
+      );
+    }
+
+    return NextResponse.json({ success: true, untagged: contacts.length });
+  }
+
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 }

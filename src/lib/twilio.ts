@@ -6,6 +6,7 @@ import { getBaseUrl } from "@/lib/stripe";
 const accountSid = process.env.TWILIO_ACCOUNT_SID || "";
 const authToken = process.env.TWILIO_AUTH_TOKEN || "";
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || "";
+const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID || "";
 
 const isDevMode =
   !accountSid ||
@@ -88,7 +89,9 @@ export async function sendFollowUpSMS({
 
   const message = await twilioClient.messages.create({
     body: smsBody,
-    from: twilioPhoneNumber,
+    ...(messagingServiceSid
+      ? { messagingServiceSid }
+      : { from: twilioPhoneNumber }),
     to: normalizedTo,
     statusCallback: `${getBaseUrl()}/api/webhooks/twilio`,
   });

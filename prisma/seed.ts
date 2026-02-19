@@ -47,6 +47,44 @@ async function main() {
   });
   console.log(`✓ Demo business: ${demoBiz.name} (${demoBiz.id})`);
 
+  // ─── 1b. Demo location ──────────────────────────────────
+  const existingLocation = await prisma.location.findFirst({
+    where: { businessId: demoBiz.id, name: "Main Office" },
+  });
+  if (!existingLocation) {
+    const loc = await prisma.location.create({
+      data: {
+        name: "Main Office",
+        address: "123 Smile Ave, Suite 100, Portland, OR 97201",
+        phone: "(555) 100-2000",
+        businessId: demoBiz.id,
+      },
+    });
+    console.log(`✓ Demo location: ${loc.name} (${loc.id})`);
+  } else {
+    console.log(`⏭ Demo location already exists`);
+  }
+
+  // ─── 1c. Demo staff member ────────────────────────────────
+  const staffHash = await bcrypt.hash("staff1234", 10);
+  const existingStaff = await prisma.user.findUnique({
+    where: { email: "alex@smiledentalcare.com" },
+  });
+  if (!existingStaff) {
+    const staff = await prisma.user.create({
+      data: {
+        name: "Alex Rivera",
+        email: "alex@smiledentalcare.com",
+        passwordHash: staffHash,
+        role: "staff",
+        businessId: demoBiz.id,
+      },
+    });
+    console.log(`✓ Demo staff: ${staff.name} (${staff.id})`);
+  } else {
+    console.log(`⏭ Demo staff already exists`);
+  }
+
   // ─── 2. System templates ─────────────────────────────────
   const systemTemplates = [
     {

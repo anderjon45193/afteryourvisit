@@ -130,6 +130,7 @@ model Integration {
   updatedAt    DateTime  @updatedAt
 
   @@unique([type, businessId]) // One integration per type per business
+  @@index([businessId])
 }
 
 model Template {
@@ -177,6 +178,8 @@ model FollowUp {
   @@index([businessId, createdAt])
   @@index([smsStatus])
   @@index([contactId])
+  @@index([locationId])
+  @@index([templateId])
 }
 
 model Snippet {

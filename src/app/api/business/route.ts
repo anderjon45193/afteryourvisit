@@ -15,7 +15,7 @@ export async function PUT(request: Request) {
   if (error) return error;
 
   const updates = await request.json();
-  const allowed = ["name", "type", "email", "phone", "websiteUrl", "bookingUrl", "googleReviewUrl"];
+  const allowed = ["name", "type", "email", "phone", "websiteUrl", "bookingUrl", "googleReviewUrl", "brandPrimaryColor", "brandSecondaryColor", "logoUrl"];
 
   const data: Record<string, string> = {};
   for (const key of allowed) {
