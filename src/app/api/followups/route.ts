@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { sendFollowUpSMS, normalizePhone } from "@/lib/twilio";
+import { checkCanSendFollowUp } from "@/lib/plan-limits";
 import { Prisma } from "@prisma/client";
 
 // GET /api/followups — List follow-ups (paginated, filterable)
@@ -63,6 +64,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return error;
+
+  const limitError = await checkCanSendFollowUp(business!);
+  if (limitError) return limitError;
 
   const body = await request.json();
   const { clientFirstName, clientPhone, templateId, customNotes, locationId } = body;

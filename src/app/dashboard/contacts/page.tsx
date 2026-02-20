@@ -195,7 +195,7 @@ function ContactsPage() {
   const [bulkSendTemplateId, setBulkSendTemplateId] = useState("");
   const [bulkSendNotes, setBulkSendNotes] = useState("");
   const [bulkSending, setBulkSending] = useState(false);
-  const [bulkSendResult, setBulkSendResult] = useState<{ sent: number; failed: number; skippedOptOut: number } | null>(null);
+  const [bulkSendResult, setBulkSendResult] = useState<{ sent: number; failed: number; skippedOptOut: number; errorMessage?: string } | null>(null);
   const [templates, setTemplates] = useState<{ id: string; name: string; isDefault: boolean }[]>([]);
 
   // Import state
@@ -404,6 +404,10 @@ function ContactsPage() {
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setBulkSendResult({ sent: 0, failed: selectedIds.size, skippedOptOut: 0, errorMessage: data.error || "Failed to send follow-ups" });
+        return;
+      }
       setBulkSendResult({ sent: data.sent, failed: data.failed, skippedOptOut: data.skippedOptOut });
     } catch {
       setBulkSendResult({ sent: 0, failed: selectedIds.size, skippedOptOut: 0 });
@@ -933,17 +937,27 @@ function ContactsPage() {
               </>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-green-800">Bulk Send Complete</p>
-                    <p className="text-sm text-green-600">
-                      {bulkSendResult.sent} sent
-                      {bulkSendResult.failed > 0 && `, ${bulkSendResult.failed} failed`}
-                      {bulkSendResult.skippedOptOut > 0 && `, ${bulkSendResult.skippedOptOut} skipped (opted out)`}
-                    </p>
+                {bulkSendResult.errorMessage ? (
+                  <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl border border-red-100">
+                    <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-red-800">Cannot Send</p>
+                      <p className="text-sm text-red-600">{bulkSendResult.errorMessage}</p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
+                    <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-green-800">Bulk Send Complete</p>
+                      <p className="text-sm text-green-600">
+                        {bulkSendResult.sent} sent
+                        {bulkSendResult.failed > 0 && `, ${bulkSendResult.failed} failed`}
+                        {bulkSendResult.skippedOptOut > 0 && `, ${bulkSendResult.skippedOptOut} skipped (opted out)`}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {bulkSendResult.skippedOptOut > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
                     <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />

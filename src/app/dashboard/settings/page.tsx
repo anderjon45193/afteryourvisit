@@ -89,6 +89,7 @@ function SettingsContent() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [business, setBusiness] = useState<Record<string, unknown> | null>(null);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
+  const [usageData, setUsageData] = useState<{ used: number; limit: number } | null>(null);
 
   // Profile form state
   const [profileForm, setProfileForm] = useState<ProfileForm>({
@@ -158,6 +159,15 @@ function SettingsContent() {
   useEffect(() => {
     if (activeTab === "team" && !teamFetched) fetchTeam();
   }, [activeTab, teamFetched, fetchTeam]);
+
+  useEffect(() => {
+    fetch("/api/usage")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) setUsageData({ used: data.followUps.used, limit: data.followUps.limit });
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/business")
@@ -620,14 +630,14 @@ function SettingsContent() {
                     <div className="flex justify-between text-xs text-warm-500 mb-1">
                       <span>Follow-ups used this month</span>
                       <span>
-                        {business ? 142 : "..."} / {planInfo.limits.followUpsPerMonth === Infinity ? "Unlimited" : planInfo.limits.followUpsPerMonth}
+                        {usageData ? usageData.used : "..."} / {planInfo.limits.followUpsPerMonth === Infinity ? "Unlimited" : planInfo.limits.followUpsPerMonth}
                       </span>
                     </div>
                     {planInfo.limits.followUpsPerMonth !== Infinity && (
                       <div className="h-2 bg-warm-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-teal-500 rounded-full transition-all"
-                          style={{ width: `${Math.min(100, (142 / planInfo.limits.followUpsPerMonth) * 100)}%` }}
+                          style={{ width: `${Math.min(100, ((usageData?.used ?? 0) / planInfo.limits.followUpsPerMonth) * 100)}%` }}
                         />
                       </div>
                     )}

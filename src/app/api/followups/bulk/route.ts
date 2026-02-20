@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { sendFollowUpSMS, normalizePhone } from "@/lib/twilio";
+import { checkCanSendFollowUp } from "@/lib/plan-limits";
 
 export async function POST(request: Request) {
   const { error, business } = await getAuthenticatedBusiness();
@@ -26,6 +27,9 @@ export async function POST(request: Request) {
   if (!template) {
     return NextResponse.json({ error: "Template not found" }, { status: 400 });
   }
+
+  const limitError = await checkCanSendFollowUp(business!, contactIds.length);
+  if (limitError) return limitError;
 
   // Load contacts (filter by businessId for security)
   const contacts = await prisma.contact.findMany({

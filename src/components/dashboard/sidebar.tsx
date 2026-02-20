@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -15,6 +16,7 @@ import {
   LogOut,
   Users,
   Puzzle,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,10 +41,27 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
+interface PlanData {
+  plan: string;
+  planName: string;
+  isTrialExpired: boolean;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user;
+
+  const [planData, setPlanData] = useState<PlanData | null>(null);
+
+  useEffect(() => {
+    fetch("/api/usage")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setPlanData({ plan: data.plan, planName: data.planName, isTrialExpired: data.isTrialExpired });
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <aside className="hidden lg:flex flex-col w-[260px] h-screen fixed left-0 top-0 bg-white border-r border-warm-200 z-40">
@@ -89,19 +108,27 @@ export function Sidebar() {
       {/* Bottom section */}
       <div className="p-4 border-t border-warm-100 space-y-3">
         {/* Plan badge */}
+        {planData?.isTrialExpired && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
+            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <span className="text-xs font-semibold text-red-700">Trial expired</span>
+          </div>
+        )}
         <div className="flex items-center justify-between px-3 py-2 bg-warm-50 rounded-lg">
           <div className="flex items-center gap-2">
             <Crown className="w-4 h-4 text-amber-500" />
             <span className="text-xs font-semibold text-warm-600">
-              Starter Plan
+              {planData ? `${planData.planName} Plan` : "Loading..."}
             </span>
           </div>
-          <Link
-            href="/dashboard/settings?tab=billing"
-            className="text-xs font-medium text-teal-600 hover:text-teal-700"
-          >
-            Upgrade
-          </Link>
+          {planData?.plan !== "pro" && (
+            <Link
+              href="/dashboard/settings?tab=billing"
+              className="text-xs font-medium text-teal-600 hover:text-teal-700"
+            >
+              Upgrade
+            </Link>
+          )}
         </div>
 
         {/* User */}
