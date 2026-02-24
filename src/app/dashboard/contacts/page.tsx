@@ -1236,6 +1236,7 @@ function ContactsPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
+            aria-label="Search contacts"
           />
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -1243,6 +1244,7 @@ function ContactsPage() {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
+              aria-pressed={filter === f.value}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                 filter === f.value
                   ? "bg-teal-600 text-white"

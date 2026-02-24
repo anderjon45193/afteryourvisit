@@ -233,6 +233,7 @@ export default function IntegrationsPage() {
                   type="file"
                   accept=".csv"
                   className="hidden"
+                  aria-label="Choose CSV file to import"
                   onChange={handleFileSelect}
                 />
               </div>

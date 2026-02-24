@@ -870,7 +870,7 @@ export default function TemplatesPage() {
             </Button>
             <Button
               className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={saving}
+              disabled={saving || !editor.name.trim()}
               onClick={handleSave}
             >
               {saving ? (

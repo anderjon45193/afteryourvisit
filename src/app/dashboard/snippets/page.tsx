@@ -161,6 +161,7 @@ export default function SnippetsPage() {
           <button
             key={cat.value}
             onClick={() => setFilter(cat.value)}
+            aria-pressed={filter === cat.value}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
               filter === cat.value
                 ? "bg-teal-600 text-white"

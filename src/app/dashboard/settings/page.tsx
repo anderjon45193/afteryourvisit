@@ -560,42 +560,42 @@ function SettingsContent() {
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-business-name" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Business Name
                     </label>
-                    <Input placeholder="e.g. Smile Dental Care" value={profileForm.name} onChange={(e) => updateProfile("name", e.target.value)} />
+                    <Input id="settings-business-name" autoComplete="organization" placeholder="e.g. Smile Dental Care" value={profileForm.name} onChange={(e) => updateProfile("name", e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-business-type" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Business Type
                     </label>
-                    <Input placeholder="e.g. dentist, vet, salon" value={profileForm.type} onChange={(e) => updateProfile("type", e.target.value)} />
+                    <Input id="settings-business-type" placeholder="e.g. dentist, vet, salon" value={profileForm.type} onChange={(e) => updateProfile("type", e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-email" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Email
                     </label>
-                    <Input placeholder="you@yourbusiness.com" value={profileForm.email} onChange={(e) => updateProfile("email", e.target.value)} className={profileValidation.email ? "border-red-300" : ""} />
+                    <Input id="settings-email" type="email" autoComplete="email" placeholder="you@yourbusiness.com" value={profileForm.email} onChange={(e) => updateProfile("email", e.target.value)} className={profileValidation.email ? "border-red-300" : ""} />
                     {profileValidation.email && <p className="text-xs text-red-500 mt-1">{profileValidation.email}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-phone" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Phone
                     </label>
-                    <Input placeholder="(555) 123-4567" value={profileForm.phone} onChange={(e) => updateProfile("phone", e.target.value)} />
+                    <Input id="settings-phone" type="tel" autoComplete="tel" placeholder="(555) 123-4567" value={profileForm.phone} onChange={(e) => updateProfile("phone", e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-website" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Website
                     </label>
-                    <Input placeholder="https://yourbusiness.com" value={profileForm.websiteUrl} onChange={(e) => updateProfile("websiteUrl", e.target.value)} className={profileValidation.websiteUrl ? "border-red-300" : ""} />
+                    <Input id="settings-website" type="url" autoComplete="url" placeholder="https://yourbusiness.com" value={profileForm.websiteUrl} onChange={(e) => updateProfile("websiteUrl", e.target.value)} className={profileValidation.websiteUrl ? "border-red-300" : ""} />
                     {profileValidation.websiteUrl && <p className="text-xs text-red-500 mt-1">{profileValidation.websiteUrl}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                    <label htmlFor="settings-booking-url" className="block text-sm font-medium text-warm-700 mb-1.5">
                       Booking URL
                     </label>
-                    <Input placeholder="https://calendly.com/your-link" value={profileForm.bookingUrl} onChange={(e) => updateProfile("bookingUrl", e.target.value)} className={profileValidation.bookingUrl ? "border-red-300" : ""} />
+                    <Input id="settings-booking-url" type="url" autoComplete="url" placeholder="https://calendly.com/your-link" value={profileForm.bookingUrl} onChange={(e) => updateProfile("bookingUrl", e.target.value)} className={profileValidation.bookingUrl ? "border-red-300" : ""} />
                     {profileValidation.bookingUrl && <p className="text-xs text-red-500 mt-1">{profileValidation.bookingUrl}</p>}
                   </div>
                 </div>
@@ -899,10 +899,12 @@ function SettingsContent() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                <label htmlFor="settings-google-review-url" className="block text-sm font-medium text-warm-700 mb-1.5">
                   Google Review URL
                 </label>
                 <Input
+                  id="settings-google-review-url"
+                  type="url"
                   value={profileForm.googleReviewUrl}
                   onChange={(e) => updateProfile("googleReviewUrl", e.target.value)}
                   placeholder="https://g.page/r/your-business/review"
@@ -1158,7 +1160,7 @@ function SettingsContent() {
                     Team Members
                   </h2>
                   <p className="text-sm text-warm-400 mt-0.5">
-                    {teamMembers.length} of {planInfo.limits.teamMembers === Infinity ? "unlimited" : planInfo.limits.teamMembers} members
+                    {teamMembers.length} member{teamMembers.length !== 1 ? "s" : ""}{planInfo.limits.teamMembers !== Infinity && ` (${planInfo.limits.teamMembers} included in plan)`}
                   </p>
                 </div>
                 {(currentUserRole === "owner" || currentUserRole === "admin") && (

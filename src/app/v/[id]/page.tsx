@@ -243,8 +243,13 @@ export default async function FollowUpPage({
           )}
         </div>
 
+        {/* SMS opt-out notice */}
+        <p className="mt-10 text-center text-[11px] text-warm-300 leading-relaxed">
+          Reply STOP to any of our texts to unsubscribe.
+        </p>
+
         {/* Footer */}
-        <footer className="mt-10 text-center">
+        <footer className="mt-4 text-center">
           <p className="text-xs text-warm-300">
             Powered by{" "}
             <a
