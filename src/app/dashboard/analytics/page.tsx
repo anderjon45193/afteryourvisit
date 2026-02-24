@@ -33,15 +33,17 @@ interface TimelineDay {
   reviewed: number;
 }
 
-function parseTrend(trend: string): { value: string; up: boolean } {
-  const up = trend.startsWith("+") && trend !== "+0%";
-  return { value: trend, up };
+function parseTrend(trend: string): { value: string; up: boolean; neutral: boolean } {
+  const neutral = trend === "+0%" || trend === "0%" || trend === "-0%";
+  const up = trend.startsWith("+") && !neutral;
+  return { value: trend, up, neutral };
 }
 
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [timeline, setTimeline] = useState<TimelineDay[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -58,7 +60,7 @@ export default function AnalyticsPage() {
         if (overviewData?.trends) setOverview(overviewData);
         if (Array.isArray(timelineData)) setTimeline(timelineData);
       })
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -169,6 +171,12 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
+      {loadError && !overview && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+          Unable to load analytics data. Please try refreshing the page.
+        </div>
+      )}
+
       {/* Summary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {summaryStats?.map((stat, i) => (
@@ -185,7 +193,7 @@ export default function AnalyticsPage() {
             <p className="text-2xl font-bold text-warm-900">{stat.value}</p>
             <p className="text-xs text-warm-400 mt-0.5">{stat.label}</p>
             <p className="text-xs text-warm-300 mt-0.5 flex items-center gap-0.5">
-              {stat.trend.up ? (
+              {stat.trend.neutral ? null : stat.trend.up ? (
                 <ArrowUpRight className="w-3 h-3 text-green-500" />
               ) : (
                 <ArrowDownRight className="w-3 h-3 text-warm-300" />
@@ -204,34 +212,46 @@ export default function AnalyticsPage() {
 
         {timeline.length > 0 ? (
           <>
-            <div className="flex items-end justify-between gap-3 h-48">
-              {timeline.map((day, i) => (
-                <motion.div
-                  key={day.date}
-                  initial={{ opacity: 0, scaleY: 0 }}
-                  animate={{ opacity: 1, scaleY: 1 }}
-                  transition={{ duration: 0.5, delay: i * 0.08 }}
-                  style={{ transformOrigin: "bottom" }}
-                  className="flex-1 flex flex-col items-center gap-2"
-                >
-                  <div className="w-full flex flex-col gap-1 items-center" style={{ height: "160px", justifyContent: "flex-end" }}>
-                    <div
-                      className="w-full max-w-[40px] bg-teal-200 rounded-t-md transition-all"
-                      style={{
-                        height: `${(day.sent / maxSent) * 100}%`,
-                        minHeight: day.sent > 0 ? "4px" : "0px",
-                      }}
-                    />
+            {(() => {
+              const allZero = timeline.every((d) => d.sent === 0);
+              return (
+                <div className="relative">
+                  {allZero && (
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <p className="text-sm text-warm-300 bg-white/80 px-3 py-1 rounded-lg">No follow-ups sent this week</p>
+                    </div>
+                  )}
+                  <div className="flex items-end justify-between gap-3 h-48">
+                    {timeline.map((day, i) => (
+                      <motion.div
+                        key={day.date}
+                        initial={{ opacity: 0, scaleY: 0 }}
+                        animate={{ opacity: 1, scaleY: 1 }}
+                        transition={{ duration: 0.5, delay: i * 0.08 }}
+                        style={{ transformOrigin: "bottom" }}
+                        className="flex-1 flex flex-col items-center gap-2"
+                      >
+                        <div className="w-full flex flex-col gap-1 items-center" style={{ height: "160px", justifyContent: "flex-end" }}>
+                          <div
+                            className={`w-full max-w-[40px] rounded-t-md transition-all ${day.sent > 0 ? "bg-teal-200" : "bg-warm-100"}`}
+                            style={{
+                              height: day.sent > 0 ? `${(day.sent / maxSent) * 100}%` : "4px",
+                              minHeight: "4px",
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-warm-400 font-medium">
+                          {day.day}
+                        </span>
+                        <span className="text-xs text-warm-600 font-semibold">
+                          {day.sent}
+                        </span>
+                      </motion.div>
+                    ))}
                   </div>
-                  <span className="text-xs text-warm-400 font-medium">
-                    {day.day}
-                  </span>
-                  <span className="text-xs text-warm-600 font-semibold">
-                    {day.sent}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
+                </div>
+              );
+            })()}
 
             <div className="flex items-center gap-6 mt-4 pt-4 border-t border-warm-50">
               <div className="flex items-center gap-2">
@@ -241,8 +261,8 @@ export default function AnalyticsPage() {
             </div>
           </>
         ) : (
-          <div className="h-48 flex items-center justify-center">
-            <p className="text-sm text-warm-400">No data for this week yet.</p>
+          <div className="h-32 flex items-center justify-center">
+            <p className="text-sm text-warm-400">No data for this week yet. Send some follow-ups to see your chart.</p>
           </div>
         )}
       </div>

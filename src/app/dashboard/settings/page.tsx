@@ -100,7 +100,14 @@ function SettingsContent() {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileValidation, setProfileValidation] = useState<Record<string, string>>({});
   const [autoBrandLoading, setAutoBrandLoading] = useState(false);
+
+  const isValidUrl = (url: string) => !url.trim() || /^https?:\/\/.+\..+/.test(url.trim());
+  const isValidHex = (hex: string) => /^#[0-9a-fA-F]{6}$/.test(hex);
+  const isValidEmail = (email: string) => !email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidGoogleUrl = (url: string) => !url.trim() || /google\.com|g\.page/i.test(url);
 
   // Session for role-based UI
   const { data: sessionData } = useSession();
@@ -114,6 +121,7 @@ function SettingsContent() {
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [locationForm, setLocationForm] = useState({ name: "", address: "", phone: "" });
   const [locationSaving, setLocationSaving] = useState(false);
+  const [locationAttempted, setLocationAttempted] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [editLocationForm, setEditLocationForm] = useState({ name: "", address: "", phone: "" });
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -125,6 +133,7 @@ function SettingsContent() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [teamForm, setTeamForm] = useState({ name: "", email: "", password: "", role: "staff" });
   const [teamSaving, setTeamSaving] = useState(false);
+  const [teamAttempted, setTeamAttempted] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -133,7 +142,10 @@ function SettingsContent() {
     setLocationsLoading(true);
     try {
       const res = await fetch("/api/locations");
-      if (res.ok) setLocations(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setLocations(Array.isArray(data) ? data : []);
+      }
     } catch { /* ignore */ } finally {
       setLocationsLoading(false);
       setLocationsFetched(true);
@@ -160,42 +172,81 @@ function SettingsContent() {
     if (activeTab === "team" && !teamFetched) fetchTeam();
   }, [activeTab, teamFetched, fetchTeam]);
 
+  const [usageLoaded, setUsageLoaded] = useState(false);
   useEffect(() => {
     fetch("/api/usage")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) setUsageData({ used: data.followUps.used, limit: data.followUps.limit });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setUsageLoaded(true));
   }, []);
 
   useEffect(() => {
-    fetch("/api/business")
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed");
-        return r.json();
-      })
-      .then((data) => {
-        setBusiness(data);
-        setProfileForm({
-          name: (data.name as string) || "",
-          type: (data.type as string) || "",
-          email: (data.email as string) || "",
-          phone: (data.phone as string) || "",
-          websiteUrl: (data.websiteUrl as string) || "",
-          bookingUrl: (data.bookingUrl as string) || "",
-          brandPrimaryColor: (data.brandPrimaryColor as string) || "#0D9488",
-          brandSecondaryColor: (data.brandSecondaryColor as string) || "#0F766E",
-          googleReviewUrl: (data.googleReviewUrl as string) || "",
-          logoUrl: (data.logoUrl as string) || "",
-        });
-      })
-      .catch(() => {});
-  }, []);
+    // Wait until the session is authenticated before loading business data
+    if (sessionData?.user === undefined) return;
+
+    let retryCount = 0;
+    let cancelled = false;
+
+    function loadBusiness() {
+      if (cancelled) return;
+      fetch("/api/business")
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed");
+          return r.json();
+        })
+        .then((data) => {
+          if (cancelled) return;
+          // If we got the empty placeholder (session not yet ready), retry up to 6 times
+          if (data._empty && retryCount < 6) {
+            retryCount++;
+            setTimeout(loadBusiness, 1000);
+            return;
+          }
+          if (!data._empty) {
+            setBusiness(data);
+            setProfileForm({
+              name: (data.name as string) || "",
+              type: (data.type as string) || "",
+              email: (data.email as string) || "",
+              phone: (data.phone as string) || "",
+              websiteUrl: (data.websiteUrl as string) || "",
+              bookingUrl: (data.bookingUrl as string) || "",
+              brandPrimaryColor: (data.brandPrimaryColor as string) || "#0D9488",
+              brandSecondaryColor: (data.brandSecondaryColor as string) || "#0F766E",
+              googleReviewUrl: (data.googleReviewUrl as string) || "",
+              logoUrl: (data.logoUrl as string) || "",
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    loadBusiness();
+
+    return () => { cancelled = true; };
+  }, [sessionData]);
 
   const handleProfileSave = async () => {
     setProfileSaving(true);
     setProfileSaved(false);
+    setProfileError("");
+    // Validate fields
+    const errors: Record<string, string> = {};
+    if (profileForm.websiteUrl && !isValidUrl(profileForm.websiteUrl)) errors.websiteUrl = "Enter a valid URL (e.g. https://example.com)";
+    if (profileForm.bookingUrl && !isValidUrl(profileForm.bookingUrl)) errors.bookingUrl = "Enter a valid URL (e.g. https://example.com)";
+    if (profileForm.email && !isValidEmail(profileForm.email)) errors.email = "Enter a valid email address";
+    if (profileForm.brandPrimaryColor && !isValidHex(profileForm.brandPrimaryColor)) errors.brandPrimaryColor = "Use hex format: #0D9488";
+    if (profileForm.brandSecondaryColor && !isValidHex(profileForm.brandSecondaryColor)) errors.brandSecondaryColor = "Use hex format: #0F766E";
+    if (profileForm.googleReviewUrl && !isValidGoogleUrl(profileForm.googleReviewUrl)) errors.googleReviewUrl = "Enter a valid Google Review URL (must contain google.com or g.page)";
+    setProfileValidation(errors);
+    if (Object.keys(errors).length > 0) {
+      setProfileSaving(false);
+      setProfileError("Please fix the validation errors below.");
+      return;
+    }
     try {
       const res = await fetch("/api/business", {
         method: "PUT",
@@ -218,9 +269,13 @@ function SettingsContent() {
         setBusiness(updated);
         setProfileSaved(true);
         setTimeout(() => setProfileSaved(false), 3000);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || `Failed to save changes (${res.status})`;
+        setProfileError(errMsg.includes("Unauthorized") ? "Your session has expired. Please sign in again." : errMsg);
       }
     } catch {
-      // Save failed
+      setProfileError("Failed to save changes. Please try again.");
     } finally {
       setProfileSaving(false);
     }
@@ -264,6 +319,7 @@ function SettingsContent() {
 
   // ── Location handlers ──────────────────────────────────
   const handleAddLocation = async () => {
+    setLocationAttempted(true);
     if (!locationForm.name.trim()) return;
     setLocationSaving(true);
     setLocationError(null);
@@ -277,6 +333,7 @@ function SettingsContent() {
         const created = await res.json();
         setLocations((prev) => [...prev, created]);
         setLocationForm({ name: "", address: "", phone: "" });
+        setLocationAttempted(false);
         setShowAddLocation(false);
       } else {
         const data = await res.json();
@@ -321,7 +378,8 @@ function SettingsContent() {
 
   // ── Team handlers ─────────────────────────────────────
   const handleAddMember = async () => {
-    if (!teamForm.name.trim() || !teamForm.email.trim() || !teamForm.password) return;
+    setTeamAttempted(true);
+    if (!teamForm.name.trim() || !teamForm.email.trim() || !teamForm.password || teamForm.password.length < 8) return;
     setTeamSaving(true);
     setTeamError(null);
     try {
@@ -334,6 +392,7 @@ function SettingsContent() {
         const created = await res.json();
         setTeamMembers((prev) => [...prev, created]);
         setTeamForm({ name: "", email: "", password: "", role: "staff" });
+        setTeamAttempted(false);
         setShowAddMember(false);
       } else {
         const data = await res.json();
@@ -394,8 +453,11 @@ function SettingsContent() {
     }
   };
 
+  const [checkoutError, setCheckoutError] = useState("");
+
   const handleUpgrade = async (planId: string) => {
     setCheckoutLoading(planId);
+    setCheckoutError("");
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -405,9 +467,12 @@ function SettingsContent() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        const errMsg = data.error || `Could not start checkout (${res.status})`;
+        setCheckoutError(errMsg.includes("Unauthorized") ? "Your session has expired. Please sign in again." : errMsg);
       }
     } catch {
-      // Checkout failed
+      setCheckoutError("Could not start checkout. Please try again.");
     } finally {
       setCheckoutLoading(null);
     }
@@ -459,6 +524,12 @@ function SettingsContent() {
                 Business Profile
               </h2>
 
+              {profileError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">
+                  {profileError}
+                </div>
+              )}
+
               <div className="space-y-5">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center overflow-hidden">
@@ -492,37 +563,40 @@ function SettingsContent() {
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Business Name
                     </label>
-                    <Input value={profileForm.name} onChange={(e) => updateProfile("name", e.target.value)} />
+                    <Input placeholder="e.g. Smile Dental Care" value={profileForm.name} onChange={(e) => updateProfile("name", e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Business Type
                     </label>
-                    <Input value={profileForm.type} onChange={(e) => updateProfile("type", e.target.value)} />
+                    <Input placeholder="e.g. dentist, vet, salon" value={profileForm.type} onChange={(e) => updateProfile("type", e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Email
                     </label>
-                    <Input value={profileForm.email} onChange={(e) => updateProfile("email", e.target.value)} />
+                    <Input placeholder="you@yourbusiness.com" value={profileForm.email} onChange={(e) => updateProfile("email", e.target.value)} className={profileValidation.email ? "border-red-300" : ""} />
+                    {profileValidation.email && <p className="text-xs text-red-500 mt-1">{profileValidation.email}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Phone
                     </label>
-                    <Input value={profileForm.phone} onChange={(e) => updateProfile("phone", e.target.value)} />
+                    <Input placeholder="(555) 123-4567" value={profileForm.phone} onChange={(e) => updateProfile("phone", e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Website
                     </label>
-                    <Input value={profileForm.websiteUrl} onChange={(e) => updateProfile("websiteUrl", e.target.value)} />
+                    <Input placeholder="https://yourbusiness.com" value={profileForm.websiteUrl} onChange={(e) => updateProfile("websiteUrl", e.target.value)} className={profileValidation.websiteUrl ? "border-red-300" : ""} />
+                    {profileValidation.websiteUrl && <p className="text-xs text-red-500 mt-1">{profileValidation.websiteUrl}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-warm-700 mb-1.5">
                       Booking URL
                     </label>
-                    <Input value={profileForm.bookingUrl} onChange={(e) => updateProfile("bookingUrl", e.target.value)} />
+                    <Input placeholder="https://calendly.com/your-link" value={profileForm.bookingUrl} onChange={(e) => updateProfile("bookingUrl", e.target.value)} className={profileValidation.bookingUrl ? "border-red-300" : ""} />
+                    {profileValidation.bookingUrl && <p className="text-xs text-red-500 mt-1">{profileValidation.bookingUrl}</p>}
                   </div>
                 </div>
 
@@ -630,7 +704,7 @@ function SettingsContent() {
                     <div className="flex justify-between text-xs text-warm-500 mb-1">
                       <span>Follow-ups used this month</span>
                       <span>
-                        {usageData ? usageData.used : "..."} / {planInfo.limits.followUpsPerMonth === Infinity ? "Unlimited" : planInfo.limits.followUpsPerMonth}
+                        {usageData ? usageData.used : usageLoaded ? "0" : "..."} / {planInfo.limits.followUpsPerMonth === Infinity ? "Unlimited" : planInfo.limits.followUpsPerMonth}
                       </span>
                     </div>
                     {planInfo.limits.followUpsPerMonth !== Infinity && (
@@ -671,6 +745,12 @@ function SettingsContent() {
                     Get more follow-ups, locations, and features.
                   </p>
 
+                  {checkoutError && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">
+                      {checkoutError}
+                    </div>
+                  )}
+
                   {/* Monthly / Annual toggle */}
                   <div className="flex justify-center mb-6">
                     <div className="inline-flex items-center gap-3 bg-warm-50 rounded-full p-1 border border-warm-200">
@@ -706,6 +786,8 @@ function SettingsContent() {
                       })
                       .map((planId) => {
                         const plan = PLANS[planId];
+                        const currentPlanFeatures = new Set<string>(PLANS[currentPlan]?.features || PLANS.starter.features);
+                        const newFeatures = (plan.features as readonly string[]).filter((f) => !currentPlanFeatures.has(f));
                         const displayPrice = billingInterval === "annual" ? plan.annualPrice : plan.monthlyPrice;
                         return (
                           <div
@@ -737,24 +819,31 @@ function SettingsContent() {
                                 Billed ${displayPrice * 12}/year
                               </p>
                             )}
-                            <ul className="mt-3 space-y-1.5">
-                              <li className="flex items-center gap-2 text-sm text-warm-600">
-                                <Check className="w-3.5 h-3.5 text-teal-500" />
-                                {plan.limits.followUpsPerMonth === Infinity
-                                  ? "Unlimited follow-ups"
-                                  : `${plan.limits.followUpsPerMonth.toLocaleString()} follow-ups/mo`}
-                              </li>
-                              <li className="flex items-center gap-2 text-sm text-warm-600">
-                                <Check className="w-3.5 h-3.5 text-teal-500" />
-                                {planId === "growth" ? "3 locations" : "Unlimited locations"}
-                              </li>
-                              <li className="flex items-center gap-2 text-sm text-warm-600">
-                                <Check className="w-3.5 h-3.5 text-teal-500" />
-                                {planId === "growth" ? "Up to 5 team members" : "Unlimited team members"}
-                              </li>
+
+                            {/* What you'll gain */}
+                            {newFeatures.length > 0 && (
+                              <div className="mt-3 mb-1">
+                                <p className="text-[10px] uppercase tracking-wider font-semibold text-teal-600 mb-1.5">
+                                  You&apos;ll gain
+                                </p>
+                              </div>
+                            )}
+                            <ul className="space-y-1.5">
+                              {newFeatures.map((feature: string) => (
+                                <li key={feature} className="flex items-center gap-2 text-sm text-warm-700 font-medium">
+                                  <Check className="w-3.5 h-3.5 text-teal-500" />
+                                  {feature}
+                                </li>
+                              ))}
                             </ul>
+
+                            {/* Everything in current plan */}
+                            <p className="text-[10px] text-warm-400 mt-3 mb-1">
+                              Plus everything in {PLANS[currentPlan]?.name || "Starter"}
+                            </p>
+
                             <Button
-                              className={`w-full mt-4 ${
+                              className={`w-full mt-3 ${
                                 planId === "growth"
                                   ? "bg-teal-600 hover:bg-teal-700 text-white"
                                   : "bg-warm-800 hover:bg-warm-900 text-white"
@@ -782,7 +871,7 @@ function SettingsContent() {
                 Google Integration
               </h2>
 
-              {profileForm.googleReviewUrl ? (
+              {profileForm.googleReviewUrl && /google\.com|g\.page/i.test(profileForm.googleReviewUrl) ? (
                 <div className="bg-green-50 rounded-xl p-5 mb-6 border border-green-100">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -817,10 +906,26 @@ function SettingsContent() {
                   value={profileForm.googleReviewUrl}
                   onChange={(e) => updateProfile("googleReviewUrl", e.target.value)}
                   placeholder="https://g.page/r/your-business/review"
+                  className={profileValidation.googleReviewUrl ? "border-red-300" : ""}
                 />
-                <p className="text-xs text-warm-400 mt-1">
-                  This is the link clients will see on their follow-up page.
-                </p>
+                {profileValidation.googleReviewUrl ? (
+                  <p className="text-xs text-red-500 mt-1.5">{profileValidation.googleReviewUrl}</p>
+                ) : (
+                  <p className="text-xs text-warm-400 mt-1.5">
+                    This is the link clients will see on their follow-up page.
+                  </p>
+                )}
+                <details className="mt-2">
+                  <summary className="text-xs text-teal-600 cursor-pointer hover:text-teal-700">
+                    How do I find my Google Review URL?
+                  </summary>
+                  <ol className="mt-2 text-xs text-warm-500 space-y-1 list-decimal list-inside">
+                    <li>Search for your business on Google Maps</li>
+                    <li>Click your business listing</li>
+                    <li>Click &ldquo;Write a review&rdquo;</li>
+                    <li>Copy the URL from your browser&apos;s address bar</li>
+                  </ol>
+                </details>
               </div>
 
               <div className="pt-4 mt-4 border-t border-warm-100">
@@ -900,7 +1005,11 @@ function SettingsContent() {
                             placeholder="e.g. Main Office"
                             value={locationForm.name}
                             onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))}
+                            className={locationAttempted && !locationForm.name.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}
                           />
+                          {locationAttempted && !locationForm.name.trim() && (
+                            <p className="text-xs text-red-500 mt-1">Location name is required</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-warm-600 mb-1">Address</label>
@@ -924,7 +1033,7 @@ function SettingsContent() {
                           size="sm"
                           className="bg-teal-600 hover:bg-teal-700 text-white"
                           onClick={handleAddLocation}
-                          disabled={locationSaving || !locationForm.name.trim()}
+                          disabled={locationSaving}
                         >
                           {locationSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
                           Save
@@ -932,7 +1041,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setShowAddLocation(false); setLocationForm({ name: "", address: "", phone: "" }); setLocationError(null); }}
+                          onClick={() => { setShowAddLocation(false); setLocationForm({ name: "", address: "", phone: "" }); setLocationError(null); setLocationAttempted(false); }}
                         >
                           Cancel
                         </Button>
@@ -1049,7 +1158,7 @@ function SettingsContent() {
                     Team Members
                   </h2>
                   <p className="text-sm text-warm-400 mt-0.5">
-                    {teamMembers.length} of {planInfo.limits.teamMembers === Infinity ? "unlimited" : planInfo.limits.teamMembers} member{planInfo.limits.teamMembers !== 1 ? "s" : ""}
+                    {teamMembers.length} of {planInfo.limits.teamMembers === Infinity ? "unlimited" : planInfo.limits.teamMembers} members
                   </p>
                 </div>
                 {(currentUserRole === "owner" || currentUserRole === "admin") && (
@@ -1109,7 +1218,12 @@ function SettingsContent() {
                             placeholder="Full name"
                             value={teamForm.name}
                             onChange={(e) => setTeamForm((f) => ({ ...f, name: e.target.value }))}
+                            autoComplete="off"
+                            className={teamAttempted && !teamForm.name.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}
                           />
+                          {teamAttempted && !teamForm.name.trim() && (
+                            <p className="text-xs text-red-500 mt-1">Name is required</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-warm-600 mb-1">Email *</label>
@@ -1118,7 +1232,12 @@ function SettingsContent() {
                             placeholder="email@example.com"
                             value={teamForm.email}
                             onChange={(e) => setTeamForm((f) => ({ ...f, email: e.target.value }))}
+                            autoComplete="new-email"
+                            className={teamAttempted && !teamForm.email.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}
                           />
+                          {teamAttempted && !teamForm.email.trim() && (
+                            <p className="text-xs text-red-500 mt-1">Email is required</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-warm-600 mb-1">Temporary Password * (min 8 chars)</label>
@@ -1127,7 +1246,15 @@ function SettingsContent() {
                             placeholder="Min 8 characters"
                             value={teamForm.password}
                             onChange={(e) => setTeamForm((f) => ({ ...f, password: e.target.value }))}
+                            autoComplete="new-password"
+                            className={teamAttempted && teamForm.password.length < 8 ? "border-red-300 focus-visible:ring-red-300" : ""}
                           />
+                          {teamAttempted && !teamForm.password && (
+                            <p className="text-xs text-red-500 mt-1">Password is required</p>
+                          )}
+                          {teamAttempted && teamForm.password && teamForm.password.length < 8 && (
+                            <p className="text-xs text-red-500 mt-1">Password must be at least 8 characters</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-warm-600 mb-1">Role</label>
@@ -1146,7 +1273,7 @@ function SettingsContent() {
                           size="sm"
                           className="bg-teal-600 hover:bg-teal-700 text-white"
                           onClick={handleAddMember}
-                          disabled={teamSaving || !teamForm.name.trim() || !teamForm.email.trim() || teamForm.password.length < 8}
+                          disabled={teamSaving}
                         >
                           {teamSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
                           Save
@@ -1154,7 +1281,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setShowAddMember(false); setTeamForm({ name: "", email: "", password: "", role: "staff" }); setTeamError(null); }}
+                          onClick={() => { setShowAddMember(false); setTeamForm({ name: "", email: "", password: "", role: "staff" }); setTeamError(null); setTeamAttempted(false); }}
                         >
                           Cancel
                         </Button>

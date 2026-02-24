@@ -8,7 +8,12 @@ import { Prisma } from "@prisma/client";
 // GET /api/followups — List follow-ups (paginated, filterable)
 export async function GET(request: NextRequest) {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) {
+    return NextResponse.json({
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+  }
 
   const searchParams = request.nextUrl.searchParams;
   const page = parseInt(searchParams.get("page") || "1");

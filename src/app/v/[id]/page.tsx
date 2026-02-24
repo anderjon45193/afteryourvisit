@@ -1,8 +1,39 @@
+import type { Metadata } from "next";
 import { Star, Calendar, ClipboardList, ExternalLink, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import type { Section } from "@/lib/types";
 import { notFound } from "next/navigation";
 import { TrackingPixel, TrackingLink } from "./tracking";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const followUp = await prisma.followUp.findUnique({
+    where: { id },
+    include: { business: true },
+  });
+
+  if (!followUp) {
+    return { title: "Follow-Up Not Found" };
+  }
+
+  const title = `Your Visit Summary — ${followUp.business.name}`;
+  const description = `Follow-up details for ${followUp.clientFirstName} from ${followUp.business.name}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+    },
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function FollowUpPage({
   params,
@@ -52,7 +83,7 @@ export default async function FollowUpPage({
       {/* Fire-and-forget page view tracking */}
       <TrackingPixel followUpId={id} />
 
-      <div className="mx-auto max-w-[480px] px-5 py-8">
+      <main className="mx-auto max-w-[480px] px-5 py-8">
         {/* Header */}
         <header className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-100 shadow-md ring-4 ring-white mb-3">
@@ -127,13 +158,18 @@ export default async function FollowUpPage({
             }
 
             if (section.type === "links" && section.links) {
+              const validLinks = section.links.filter(
+                (link: { label: string; url: string }) =>
+                  link.url && link.url !== "#" && link.url.startsWith("http")
+              );
+              if (validLinks.length === 0) return null;
               return (
                 <div key={i} className="bg-white rounded-xl p-5 shadow-card">
                   <h2 className="text-sm font-semibold text-warm-700 mb-3 font-[family-name:var(--font-body)]">
                     {section.title}
                   </h2>
                   <div className="space-y-2">
-                    {section.links.map(
+                    {validLinks.map(
                       (link: { label: string; url: string }, j: number) => (
                         <a
                           key={j}
@@ -219,7 +255,7 @@ export default async function FollowUpPage({
             </a>
           </p>
         </footer>
-      </div>
+      </main>
     </div>
   );
 }

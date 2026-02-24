@@ -20,10 +20,24 @@ async function main() {
   // ─── 1. Create demo business ─────────────────────────────
   const passwordHash = await bcrypt.hash("demo1234", 10);
 
+  // Use stable IDs so that existing JWT sessions remain valid after re-seeding
+  const DEMO_BIZ_ID = "demo-biz-1";
+  const DEMO_USER_ID = "demo-user-1";
+
   const demoBiz = await prisma.business.upsert({
     where: { email: "info@smiledentalcare.com" },
-    update: {},
+    update: {
+      name: "Smile Dental Care",
+      type: "dentist",
+      phone: "(555) 100-2000",
+      brandPrimaryColor: "#0D9488",
+      brandSecondaryColor: "#0F766E",
+      googleReviewUrl: "https://g.page/r/smile-dental-care/review",
+      websiteUrl: "https://smiledentalcare.com",
+      bookingUrl: "https://calendly.com/smile-dental",
+    },
     create: {
+      id: DEMO_BIZ_ID,
       name: "Smile Dental Care",
       type: "dentist",
       email: "info@smiledentalcare.com",
@@ -37,6 +51,7 @@ async function main() {
       trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       users: {
         create: {
+          id: DEMO_USER_ID,
           name: "Demo User",
           email: "demo@afteryourvisit.com",
           passwordHash,
@@ -110,7 +125,7 @@ async function main() {
           title: "Helpful Resources",
           links: [
             { label: "Brushing Technique Guide", url: "https://www.ada.org" },
-            { label: "Patient Portal Login", url: "#" },
+            { label: "Patient Portal Login", url: "https://portal.example.com" },
           ],
         },
       ],
@@ -179,9 +194,9 @@ async function main() {
     },
   ];
 
-  // Check if templates already exist
+  // Check if templates already exist (check globally to prevent duplicates)
   const existingTemplates = await prisma.template.count({
-    where: { isSystemTemplate: true, businessId: demoBiz.id },
+    where: { isSystemTemplate: true },
   });
 
   let tplIds: string[] = [];
@@ -194,7 +209,7 @@ async function main() {
   } else {
     console.log(`⏭ System templates already exist (${existingTemplates})`);
     const existing = await prisma.template.findMany({
-      where: { isSystemTemplate: true, businessId: demoBiz.id },
+      where: { isSystemTemplate: true },
       select: { id: true },
     });
     tplIds = existing.map((t) => t.id);
@@ -250,6 +265,7 @@ async function main() {
   if (existingFollowUps === 0 && tplIds.length >= 3) {
     const followUps = [
       {
+        id: "fu-1",
         clientFirstName: "Sarah",
         clientPhone: "(555) 123-4567",
         customNotes: "Routine cleaning completed. No cavities found! Continue flossing daily.",
@@ -261,6 +277,7 @@ async function main() {
         createdAt: new Date("2026-02-18T14:30:00.000Z"),
       },
       {
+        id: "fu-2",
         clientFirstName: "Nicole",
         clientPhone: "(555) 111-2233",
         customNotes: "Teeth whitening completed — 4 shades brighter. Avoid dark beverages for 48 hours.",
@@ -271,6 +288,7 @@ async function main() {
         createdAt: new Date("2026-02-18T15:30:00.000Z"),
       },
       {
+        id: "fu-3",
         clientFirstName: "Kevin",
         clientPhone: "(555) 222-3344",
         customNotes: "Root canal on tooth #19. Temporary filling placed. Return in 2 weeks for permanent crown.",
@@ -282,6 +300,7 @@ async function main() {
         createdAt: new Date("2026-02-18T12:30:00.000Z"),
       },
       {
+        id: "fu-4",
         clientFirstName: "Amy",
         clientPhone: "(555) 789-0123",
         customNotes: "Crown prep on #30. Temporary crown placed. Permanent crown ready in 2 weeks.",
@@ -293,6 +312,7 @@ async function main() {
         createdAt: new Date("2026-02-16T15:15:00.000Z"),
       },
       {
+        id: "fu-5",
         clientFirstName: "Rachel",
         clientPhone: "(555) 901-2345",
         customNotes: "Retainer check. Teeth look great, continue wearing retainer nightly.",
@@ -305,6 +325,7 @@ async function main() {
         createdAt: new Date("2026-02-15T11:00:00.000Z"),
       },
       {
+        id: "fu-6",
         clientFirstName: "Chris",
         clientPhone: "(555) 012-3456",
         customNotes: "Routine cleaning. Recommended electric toothbrush.",
@@ -314,6 +335,7 @@ async function main() {
         createdAt: new Date("2026-02-15T09:30:00.000Z"),
       },
       {
+        id: "fu-7",
         clientFirstName: "Priya",
         clientPhone: "(555) 333-4455",
         customNotes: "Periodontal maintenance. Gum health improved — pocket depths reduced from 5mm to 3mm.",
@@ -323,6 +345,7 @@ async function main() {
         createdAt: new Date("2026-02-17T15:00:00.000Z"),
       },
       {
+        id: "fu-8",
         clientFirstName: "Marcus",
         clientPhone: "(555) 444-5566",
         customNotes: "Dental implant consultation for missing #8. Treatment plan provided.",
@@ -334,6 +357,7 @@ async function main() {
         createdAt: new Date("2026-02-17T11:00:00.000Z"),
       },
       {
+        id: "fu-9",
         clientFirstName: "Tom",
         clientPhone: "(555) 890-1234",
         customNotes: "Routine cleaning and fluoride treatment.",
@@ -344,6 +368,7 @@ async function main() {
         createdAt: new Date("2026-02-16T13:45:00.000Z"),
       },
       {
+        id: "fu-10",
         clientFirstName: "Olivia",
         clientPhone: "(555) 555-6677",
         customNotes: "Child's first dental visit (age 3). All 20 primary teeth present and healthy!",

@@ -23,16 +23,16 @@ export function SocialProof() {
           className="flex flex-col sm:flex-row items-center justify-center gap-6"
         >
           <p className="text-sm font-medium text-warm-500">
-            Trusted by 2,000+ local businesses
+            Built for local service businesses
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide px-2 -mx-2 sm:overflow-visible sm:px-0 sm:mx-0">
             {industries.map((ind) => (
               <div
                 key={ind.label}
-                className="flex items-center gap-1.5 text-warm-400"
+                className="flex items-center gap-1.5 text-warm-400 flex-shrink-0"
                 title={ind.label}
               >
-                <span className="text-lg">{ind.icon}</span>
+                <span className="text-lg" aria-hidden="true">{ind.icon}</span>
                 <span className="text-xs hidden sm:inline">{ind.label}</span>
               </div>
             ))}

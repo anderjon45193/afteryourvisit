@@ -17,7 +17,10 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AfterYourVisit — Smart Follow-Up Texts for Local Businesses",
+  title: {
+    template: "%s — AfterYourVisit",
+    default: "AfterYourVisit — Smart Follow-Up Texts for Local Businesses",
+  },
   description:
     "Send beautiful follow-up texts after every appointment. Generate Google reviews on autopilot. Free 14-day trial.",
   keywords: [
@@ -28,11 +31,13 @@ export const metadata: Metadata = {
     "vet follow-up",
     "local business reviews",
   ],
+  metadataBase: new URL("https://afteryourvisit.com"),
   openGraph: {
-    title: "AfterYourVisit — Smart Follow-Up Texts for Local Businesses",
-    description:
-      "Send beautiful follow-up texts after every appointment. Generate Google reviews on autopilot.",
+    siteName: "AfterYourVisit",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
   },
 };
 

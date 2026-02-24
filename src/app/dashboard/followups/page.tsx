@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Eye, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import Link from "next/link";
 
 interface FollowUpItem {
@@ -106,7 +106,7 @@ export default function FollowUpsPage() {
       <div className="bg-white rounded-xl border border-warm-100 shadow-sm overflow-hidden">
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Follow-ups history">
             <thead>
               <tr className="border-b border-warm-100 bg-warm-50/50">
                 <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Client</th>
@@ -183,7 +183,18 @@ export default function FollowUpsPage() {
 
         {followUps.length === 0 && !loading && (
           <div className="p-12 text-center">
-            <p className="text-warm-400">No follow-ups found.</p>
+            <Send className="w-8 h-8 text-warm-200 mx-auto mb-3" />
+            <p className="text-warm-400 mb-3">
+              {search ? "No follow-ups match your search." : "No follow-ups sent yet."}
+            </p>
+            {!search && (
+              <Link href="/dashboard/send">
+                <Button className="bg-teal-600 hover:bg-teal-700 text-white" size="sm">
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Your First Follow-Up
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
@@ -195,29 +206,31 @@ export default function FollowUpsPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between mt-4">
-        <p className="text-sm text-warm-400">
-          Showing {followUps.length} of {pagination.total}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page <= 1}
-            onClick={() => fetchData(pagination.page - 1, search)}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() => fetchData(pagination.page + 1, search)}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-sm text-warm-400">
+            Page {pagination.page} of {pagination.totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => fetchData(pagination.page - 1, search)}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => fetchData(pagination.page + 1, search)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

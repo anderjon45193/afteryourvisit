@@ -33,15 +33,13 @@ export const authConfig: NextAuthConfig = {
     async authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isDashboard = nextUrl.pathname.startsWith("/dashboard");
-      const isAuthPage =
-        nextUrl.pathname.startsWith("/sign-in") ||
-        nextUrl.pathname.startsWith("/sign-up");
 
       if (isDashboard && !isLoggedIn) {
         return Response.redirect(new URL("/sign-in", nextUrl));
       }
 
-      if (isAuthPage && isLoggedIn) {
+      // Only redirect logged-in users away from sign-in (not sign-up)
+      if (nextUrl.pathname.startsWith("/sign-in") && isLoggedIn) {
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
 

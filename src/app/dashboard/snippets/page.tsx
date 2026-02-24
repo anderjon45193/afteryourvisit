@@ -30,6 +30,7 @@ export default function SnippetsPage() {
   const [newCategory, setNewCategory] = useState("general");
   const [showAdd, setShowAdd] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addAttempted, setAddAttempted] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function SnippetsPage() {
     filter === "all" ? snippets : snippets.filter((s) => s.category === filter);
 
   const handleAdd = async () => {
+    setAddAttempted(true);
     if (!newSnippet.trim() || adding) return;
     setAdding(true);
     try {
@@ -65,6 +67,7 @@ export default function SnippetsPage() {
         const created = await res.json();
         setSnippets([created, ...snippets]);
         setNewSnippet("");
+        setAddAttempted(false);
         setShowAdd(false);
       }
     } catch {
@@ -117,9 +120,9 @@ export default function SnippetsPage() {
             <Input
               placeholder="Enter snippet text..."
               value={newSnippet}
-              onChange={(e) => setNewSnippet(e.target.value)}
+              onChange={(e) => { setNewSnippet(e.target.value); setAddAttempted(false); }}
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              className="flex-1"
+              className={`flex-1 ${addAttempted && !newSnippet.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
               autoFocus
             />
             <Button onClick={handleAdd} disabled={adding} className="bg-teal-600 hover:bg-teal-700 text-white">
@@ -129,6 +132,9 @@ export default function SnippetsPage() {
               <X className="w-4 h-4" />
             </Button>
           </div>
+          {addAttempted && !newSnippet.trim() && (
+            <p className="text-xs text-red-500 mb-2">Snippet text is required</p>
+          )}
           <div className="flex gap-2">
             {categories
               .filter((c) => c.value !== "all")
@@ -216,11 +222,21 @@ export default function SnippetsPage() {
       {!loading && filtered.length === 0 && (
         <div className="text-center py-12">
           <Sparkles className="w-8 h-8 text-warm-200 mx-auto mb-3" />
-          <p className="text-warm-400">
+          <p className="text-warm-400 mb-3">
             {snippets.length === 0
-              ? "No snippets yet. Add your first one above."
+              ? "Snippets are reusable text you can quickly insert into follow-up notes."
               : "No snippets match this filter."}
           </p>
+          {snippets.length === 0 && (
+            <Button
+              onClick={() => setShowAdd(true)}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Your First Snippet
+            </Button>
+          )}
         </div>
       )}
     </>

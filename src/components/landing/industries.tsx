@@ -70,24 +70,22 @@ export function Industries() {
           {industries.map((ind, i) => (
             <motion.a
               key={ind.name}
-              href={`/v/${ind.demoId}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/sign-up"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: i * 0.1 }}
-              className="group relative bg-white rounded-xl border border-warm-100 p-6 hover:-translate-y-1 hover:shadow-lg hover:border-teal-200 transition-all duration-250 cursor-pointer block"
+              className="group relative bg-white rounded-xl border border-warm-100 p-6 hover:-translate-y-1 hover:shadow-lg hover:border-teal-200 transition-all duration-250 cursor-pointer block flex flex-col"
             >
-              <span className="text-3xl mb-4 block">{ind.icon}</span>
+              <span className="text-3xl mb-4 block" aria-hidden="true">{ind.icon}</span>
               <h3 className="text-lg font-[family-name:var(--font-display)] text-warm-900 mb-2">
                 {ind.name}
               </h3>
-              <p className="text-sm text-warm-500 italic leading-relaxed">
+              <p className="text-sm text-warm-500 italic leading-relaxed mb-4">
                 {ind.preview}
               </p>
-              <span className="mt-4 inline-block text-sm font-medium text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                See Template →
+              <span className="inline-block text-sm font-semibold text-teal-600 group-hover:text-teal-700 transition-colors">
+                Try Free →
               </span>
             </motion.a>
           ))}

@@ -87,13 +87,19 @@ export async function sendFollowUpSMS({
     return `SM_mock_${Date.now()}`;
   }
 
+  const baseUrl = getBaseUrl();
+  const isPublicUrl =
+    baseUrl.startsWith("https://") && !baseUrl.includes("localhost");
+
   const message = await twilioClient.messages.create({
     body: smsBody,
     ...(messagingServiceSid
       ? { messagingServiceSid }
       : { from: twilioPhoneNumber }),
     to: normalizedTo,
-    statusCallback: `${getBaseUrl()}/api/webhooks/twilio`,
+    ...(isPublicUrl && {
+      statusCallback: `${baseUrl}/api/webhooks/twilio`,
+    }),
   });
 
   console.log(`[Twilio] SMS sent — SID: ${message.sid}`);

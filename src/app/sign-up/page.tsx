@@ -39,10 +39,12 @@ const businessTypes = [
 
 const TOTAL_STEPS = 4;
 
-const steps = [
+// Stepper always shows 3 steps. Step 3 (brand) is an interstitial
+// that appears between "Your Business" and "Personalize" only when
+// a website URL is entered — but the stepper count stays at 3.
+const stepperSteps = [
   { number: 1, label: "Your Account", icon: User },
   { number: 2, label: "Your Business", icon: Building2 },
-  { number: 3, label: "Your Brand", icon: Sparkles },
   { number: 4, label: "Personalize", icon: Palette },
 ];
 
@@ -88,32 +90,38 @@ function SignUpForm() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [bookingUrl, setBookingUrl] = useState("");
 
-  const canProceedStep1 = name.trim() && email.trim() && password.length >= 8;
-  const canProceedStep2 = businessName.trim() && businessType;
+  const [attemptedStep1, setAttemptedStep1] = useState(false);
+  const [attemptedStep2, setAttemptedStep2] = useState(false);
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidUrl = (url: string) => !url.trim() || /^https?:\/\/.+\..+/.test(url.trim()) || /^[a-zA-Z0-9].*\..+/.test(url.trim());
+  const isValidHex = (hex: string) => /^#[0-9a-fA-F]{6}$/.test(hex);
+  const canProceedStep1 = name.trim() && email.trim() && isValidEmail && password.length >= 8;
+  const canProceedStep2 = businessName.trim() && businessType && isValidUrl(websiteUrl);
+  const canProceedStep3 = isValidHex(brandPrimaryColor) && isValidHex(brandSecondaryColor);
 
-  // Visible steps (skip step 3 if no website URL)
   const hasWebsite = websiteUrl.trim().length > 0;
-
-  const getVisibleStep = (logicalStep: number): number => {
-    if (!hasWebsite && logicalStep >= 3) return logicalStep + 1;
-    return logicalStep;
-  };
-
-  const getLogicalStep = (visibleStep: number): number => {
-    if (!hasWebsite && visibleStep >= 3) return visibleStep - 1;
-    return visibleStep;
-  };
-
-  const visibleSteps = hasWebsite
-    ? steps
-    : steps.filter((s) => s.number !== 3);
 
   const handleNext = () => {
     setError("");
-    if (step === 2 && !hasWebsite) {
-      // Skip brand step
-      setStep(4);
-    } else if (step < TOTAL_STEPS) {
+    if (step === 1) {
+      setAttemptedStep1(true);
+      if (!canProceedStep1) return;
+    }
+    if (step === 2) {
+      setAttemptedStep2(true);
+      if (!canProceedStep2) return;
+      if (!hasWebsite) {
+        setStep(4);
+        return;
+      }
+    }
+    if (step === 3) {
+      if (!canProceedStep3) {
+        setError("Please enter valid hex color codes (e.g. #0D9488)");
+        return;
+      }
+    }
+    if (step < TOTAL_STEPS) {
       setStep(step + 1);
     }
   };
@@ -237,36 +245,41 @@ function SignUpForm() {
           </Link>
         </div>
 
-        {/* Progress steps */}
+        {/* Progress steps — always 3 items */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {visibleSteps.map((s, i) => (
-            <div key={s.number} className="flex items-center">
-              <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  step === s.number
-                    ? "bg-teal-600 text-white"
-                    : step > s.number
-                    ? "bg-teal-100 text-teal-700"
-                    : "bg-warm-100 text-warm-400"
-                }`}
-              >
-                {step > s.number ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <s.icon className="w-3 h-3" />
-                )}
-                <span className="hidden sm:inline">{s.label}</span>
-                <span className="sm:hidden">{i + 1}</span>
-              </div>
-              {i < visibleSteps.length - 1 && (
+          {stepperSteps.map((s, i) => {
+            // Step 3 (brand) is a hidden interstitial, so treat it as part of step 2 in the stepper
+            const isActive = step === s.number || (s.number === 2 && step === 3);
+            const isCompleted = step > s.number || (s.number === 2 && step > 3);
+            return (
+              <div key={s.number} className="flex items-center">
                 <div
-                  className={`w-8 h-px mx-1 ${
-                    step > s.number ? "bg-teal-300" : "bg-warm-200"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-teal-600 text-white"
+                      : isCompleted
+                      ? "bg-teal-100 text-teal-700"
+                      : "bg-warm-100 text-warm-400"
                   }`}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  {isCompleted ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    <s.icon className="w-3 h-3" />
+                  )}
+                  <span className="hidden sm:inline">{s.label}</span>
+                  <span className="sm:hidden">{i + 1}</span>
+                </div>
+                {i < stepperSteps.length - 1 && (
+                  <div
+                    className={`w-8 h-px mx-1 ${
+                      isCompleted ? "bg-teal-300" : "bg-warm-200"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Card */}
@@ -290,51 +303,74 @@ function SignUpForm() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-name" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Your full name
                   </label>
                   <Input
+                    id="signup-name"
+                    name="name"
                     type="text"
                     placeholder="Dr. Sarah Chen"
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-11"
+                    className={`h-11 ${attemptedStep1 && !name.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                     autoFocus
                   />
+                  {attemptedStep1 && !name.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Name is required</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-email" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Email address
                   </label>
                   <Input
+                    id="signup-email"
+                    name="email"
                     type="email"
                     placeholder="you@yourbusiness.com"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-11"
+                    className={`h-11 ${attemptedStep1 && (!email.trim() || !isValidEmail) ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {attemptedStep1 && !email.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Email is required</p>
+                  )}
+                  {attemptedStep1 && email.trim() && !isValidEmail && (
+                    <p className="text-xs text-red-500 mt-1">Enter a valid email address</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-password" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Password
                   </label>
                   <Input
+                    id="signup-password"
+                    name="password"
                     type="password"
                     placeholder="At least 8 characters"
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-11"
+                    className={`h-11 ${attemptedStep1 && password.length < 8 ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
-                  <p className="text-xs text-warm-300 mt-1">
-                    Must be at least 8 characters
-                  </p>
+                  {attemptedStep1 && password.length === 0 ? (
+                    <p className="text-xs text-red-500 mt-1">Password is required</p>
+                  ) : attemptedStep1 && password.length < 8 ? (
+                    <p className="text-xs text-red-500 mt-1">Password must be at least 8 characters</p>
+                  ) : (
+                    <p className="text-xs text-warm-300 mt-1">
+                      Must be at least 8 characters
+                    </p>
+                  )}
                 </div>
 
                 <Button
                   onClick={handleNext}
-                  disabled={!canProceedStep1}
                   className="w-full h-11 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
                 >
                   Continue
@@ -356,17 +392,23 @@ function SignUpForm() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-business-name" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Business name
                   </label>
                   <Input
+                    id="signup-business-name"
+                    name="business-name"
                     type="text"
                     placeholder="Smile Dental Care"
+                    autoComplete="organization"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
-                    className="h-11"
+                    className={`h-11 ${attemptedStep2 && !businessName.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                     autoFocus
                   />
+                  {attemptedStep2 && !businessName.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Business name is required</p>
+                  )}
                 </div>
 
                 <div>
@@ -374,7 +416,7 @@ function SignUpForm() {
                     Business type
                   </label>
                   <Select value={businessType} onValueChange={setBusinessType}>
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger className={`h-11 ${attemptedStep2 && !businessType ? "border-red-300 focus-visible:ring-red-300" : ""}`}>
                       <SelectValue placeholder="Select your industry" />
                     </SelectTrigger>
                     <SelectContent>
@@ -385,16 +427,22 @@ function SignUpForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {attemptedStep2 && !businessType && (
+                    <p className="text-xs text-red-500 mt-1">Please select a business type</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-business-phone" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Business phone{" "}
                     <span className="text-warm-300 font-normal">(optional)</span>
                   </label>
                   <Input
+                    id="signup-business-phone"
+                    name="business-phone"
                     type="tel"
                     placeholder="(555) 123-4567"
+                    autoComplete="tel"
                     value={businessPhone}
                     onChange={(e) => setBusinessPhone(e.target.value)}
                     className="h-11"
@@ -402,15 +450,18 @@ function SignUpForm() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="signup-website" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Website URL{" "}
                     <span className="text-warm-300 font-normal">(optional)</span>
                   </label>
                   <div className="relative">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-300" />
                     <Input
+                      id="signup-website"
+                      name="website"
                       type="url"
                       placeholder="www.yourbusiness.com"
+                      autoComplete="url"
                       value={websiteUrl}
                       onChange={(e) => {
                         setWebsiteUrl(e.target.value);
@@ -421,9 +472,14 @@ function SignUpForm() {
                       className="h-11 pl-10"
                     />
                   </div>
-                  <p className="text-xs text-warm-300 mt-1">
-                    We&apos;ll auto-detect your logo and brand colors
-                  </p>
+                  {attemptedStep2 && websiteUrl.trim() && !isValidUrl(websiteUrl) && (
+                    <p className="text-xs text-red-500 mt-1">Please enter a valid URL (e.g. https://yourbusiness.com)</p>
+                  )}
+                  {(!attemptedStep2 || !websiteUrl.trim() || isValidUrl(websiteUrl)) && (
+                    <p className="text-xs text-warm-300 mt-1">
+                      We&apos;ll auto-detect your logo and brand colors
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -437,7 +493,6 @@ function SignUpForm() {
                   </Button>
                   <Button
                     onClick={handleNext}
-                    disabled={!canProceedStep2}
                     className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
                   >
                     Continue
@@ -525,17 +580,20 @@ function SignUpForm() {
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
-                            value={brandPrimaryColor}
+                            value={isValidHex(brandPrimaryColor) ? brandPrimaryColor : "#0D9488"}
                             onChange={(e) => setBrandPrimaryColor(e.target.value)}
                             className="w-10 h-10 rounded-lg border border-warm-200 cursor-pointer p-0.5"
                           />
                           <Input
                             value={brandPrimaryColor}
                             onChange={(e) => setBrandPrimaryColor(e.target.value)}
-                            className="flex-1 text-sm h-10"
+                            className={`flex-1 text-sm h-10 ${brandPrimaryColor && !isValidHex(brandPrimaryColor) ? "border-red-300" : ""}`}
                             maxLength={7}
                           />
                         </div>
+                        {brandPrimaryColor && !isValidHex(brandPrimaryColor) && (
+                          <p className="text-xs text-red-500 mt-1">Use hex format: #0D9488</p>
+                        )}
                       </div>
                       <div className="flex-1">
                         <label className="block text-xs text-warm-400 mb-1">
@@ -544,17 +602,20 @@ function SignUpForm() {
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
-                            value={brandSecondaryColor}
+                            value={isValidHex(brandSecondaryColor) ? brandSecondaryColor : "#0F766E"}
                             onChange={(e) => setBrandSecondaryColor(e.target.value)}
                             className="w-10 h-10 rounded-lg border border-warm-200 cursor-pointer p-0.5"
                           />
                           <Input
                             value={brandSecondaryColor}
                             onChange={(e) => setBrandSecondaryColor(e.target.value)}
-                            className="flex-1 text-sm h-10"
+                            className={`flex-1 text-sm h-10 ${brandSecondaryColor && !isValidHex(brandSecondaryColor) ? "border-red-300" : ""}`}
                             maxLength={7}
                           />
                         </div>
+                        {brandSecondaryColor && !isValidHex(brandSecondaryColor) && (
+                          <p className="text-xs text-red-500 mt-1">Use hex format: #0F766E</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -603,7 +664,7 @@ function SignUpForm() {
                 </Button>
                 <Button
                   onClick={handleNext}
-                  disabled={brandLoading}
+                  disabled={brandLoading || !canProceedStep3}
                   className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
                 >
                   Continue

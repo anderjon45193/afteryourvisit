@@ -12,6 +12,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   Select,
@@ -40,6 +41,10 @@ import {
   Loader2,
   Tag,
   ChevronDown,
+  Clock,
+  BarChart3,
+  FileText,
+  MessageSquare,
 } from "lucide-react";
 import { TagInput } from "@/components/dashboard/tag-input";
 import Link from "next/link";
@@ -189,6 +194,7 @@ function ContactsPage() {
   // Add contact form
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
   const [addError, setAddError] = useState("");
+  const [addAttempted, setAddAttempted] = useState(false);
 
   // Bulk send state
   const [showBulkSend, setShowBulkSend] = useState(false);
@@ -333,11 +339,35 @@ function ContactsPage() {
     }
   };
 
+  // Validation helpers
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const formatPhone = (v: string) => {
+    let digits = v.replace(/\D/g, "");
+    // Strip leading country code 1
+    if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+    // Cap at 10 digits
+    digits = digits.slice(0, 10);
+    if (digits.length === 0) return "";
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  };
+  const isValidPhone = (v: string) => {
+    const digits = v.replace(/\D/g, "");
+    return digits.length === 10 || (digits.length === 11 && digits[0] === "1");
+  };
+
   // Add contact
   const handleAdd = async () => {
     setAddError("");
+    setAddAttempted(true);
     if (!addForm.firstName.trim() || !addForm.phone.trim()) {
-      setAddError("First name and phone are required");
+      return;
+    }
+    if (!isValidPhone(addForm.phone)) {
+      return;
+    }
+    if (addForm.email.trim() && !isValidEmail(addForm.email.trim())) {
       return;
     }
     try {
@@ -353,12 +383,14 @@ function ContactsPage() {
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setAddError(data.error || "Failed to add contact");
+        const data = await res.json().catch(() => ({}));
+        const errMsg = data.error || `Failed to add contact (${res.status})`;
+        setAddError(errMsg.includes("Unauthorized") ? "Please sign in again to add contacts." : errMsg);
         return;
       }
       setShowAddSheet(false);
       setAddForm({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
+      setAddAttempted(false);
       fetchContacts();
     } catch {
       setAddError("Something went wrong");
@@ -524,6 +556,10 @@ function ContactsPage() {
   if (!loading && contacts.length === 0 && !search && filter === "all" && !tagFilter) {
     return (
       <>
+        <div className="mb-6">
+          <h1 className="text-2xl text-warm-900">Contacts</h1>
+          <p className="text-sm text-warm-400 mt-1">Manage your client database</p>
+        </div>
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mb-4">
             <Users className="w-8 h-8 text-warm-400" />
@@ -555,35 +591,98 @@ function ContactsPage() {
   function renderAddSheet() {
     return (
       <Sheet open={showAddSheet} onOpenChange={setShowAddSheet}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="sr-only">
             <SheetTitle>Add Contact</SheetTitle>
+            <SheetDescription>Add a new client to your contact list</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-4">
+
+          {/* Branded header */}
+          <div className="px-6 pt-7 pb-5 border-b border-warm-100">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                <Users className="w-[18px] h-[18px] text-teal-600" />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-warm-800">Add Contact</h3>
+                <p className="text-xs text-warm-400 mt-0.5">Add a new client to your contact list</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable form area */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
             {addError && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">{addError}</div>
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700 mb-5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {addError}
+              </div>
             )}
-            <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">First Name *</label>
-              <Input value={addForm.firstName} onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })} placeholder="Sarah" />
+
+            <div className="space-y-5">
+              {/* Name group */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-3.5 h-3.5 text-warm-400" />
+                  <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Name</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-warm-600 mb-1.5">First Name *</label>
+                    <Input value={addForm.firstName} onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })} placeholder="Sarah" className={`rounded-xl h-10 text-[14px] ${addAttempted && !addForm.firstName.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`} />
+                    {addAttempted && !addForm.firstName.trim() && (
+                      <p className="text-xs text-red-500 mt-1">First name is required</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Last Name</label>
+                    <Input value={addForm.lastName} onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })} placeholder="Johnson" className="rounded-xl h-10 text-[14px]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact info group */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="w-3.5 h-3.5 text-warm-400" />
+                  <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Contact Info</span>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Phone *</label>
+                    <Input value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" className={`rounded-xl h-10 text-[14px] ${addAttempted && (!addForm.phone.trim() || !isValidPhone(addForm.phone)) ? "border-red-300 focus-visible:ring-red-300" : ""}`} />
+                    {addAttempted && !addForm.phone.trim() && (
+                      <p className="text-xs text-red-500 mt-1">Phone number is required</p>
+                    )}
+                    {addAttempted && addForm.phone.trim() && !isValidPhone(addForm.phone) && (
+                      <p className="text-xs text-red-500 mt-1">Enter a valid 10-digit US phone number</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Email</label>
+                    <Input value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} placeholder="sarah@email.com" className={`rounded-xl h-10 text-[14px] ${addAttempted && addForm.email.trim() && !isValidEmail(addForm.email.trim()) ? "border-red-300 focus-visible:ring-red-300" : ""}`} />
+                    {addAttempted && addForm.email.trim() && !isValidEmail(addForm.email.trim()) && (
+                      <p className="text-xs text-red-500 mt-1">Enter a valid email address</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes group */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Pencil className="w-3.5 h-3.5 text-warm-400" />
+                  <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Notes</span>
+                </div>
+                <Textarea value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} placeholder="Any notes about this contact..." className="resize-none rounded-xl text-[14px] min-h-[80px]" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Last Name</label>
-              <Input value={addForm.lastName} onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })} placeholder="Johnson" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Phone *</label>
-              <Input value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })} placeholder="(555) 123-4567" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Email</label>
-              <Input value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} placeholder="sarah@email.com" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Notes</label>
-              <Textarea value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} placeholder="Any notes about this contact..." className="resize-none" />
-            </div>
-            <Button onClick={handleAdd} className="w-full bg-teal-600 hover:bg-teal-700 text-white">
+          </div>
+
+          {/* Sticky footer */}
+          <div className="px-6 py-4 border-t border-warm-100">
+            <Button onClick={handleAdd} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+              <Plus className="w-4 h-4 mr-2" />
               Save Contact
             </Button>
           </div>
@@ -598,6 +697,7 @@ function ContactsPage() {
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Import Contacts</SheetTitle>
+            <SheetDescription>Upload a CSV file to import contacts in bulk</SheetDescription>
           </SheetHeader>
           <div className="mt-6">
             {importStep === 1 && (
@@ -721,143 +821,245 @@ function ContactsPage() {
 
   function renderDetailSheet() {
     return (
-      <Sheet open={!!detailContact} onOpenChange={(open) => { if (!open) setDetailContact(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <Sheet open={!!detailContact} onOpenChange={(open) => { if (!open) { setDetailContact(null); setEditing(false); } }}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Contact Details</SheetTitle>
+            <SheetDescription>View and edit contact details and follow-up history</SheetDescription>
+          </SheetHeader>
+
           {detailContact && (
             <>
-              <SheetHeader>
-                <SheetTitle className="sr-only">Contact Details</SheetTitle>
-              </SheetHeader>
-              <div className="mt-2">
-                {/* Header */}
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
-                    <span className="text-base font-semibold text-teal-700">
+              {/* Branded header */}
+              <div className="px-6 pt-7 pb-5 border-b border-warm-100">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-semibold text-teal-700">
                       {getInitials(detailContact.firstName, detailContact.lastName)}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    {!editing ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-warm-800">
-                            {detailContact.firstName} {detailContact.lastName || ""}
-                          </h3>
-                          <button onClick={startEditing} className="text-warm-300 hover:text-teal-600 transition-colors">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-semibold text-warm-800 truncate">
+                        {detailContact.firstName} {detailContact.lastName || ""}
+                      </h3>
+                      {!editing && (
+                        <button onClick={startEditing} className="text-warm-300 hover:text-teal-600 transition-colors flex-shrink-0">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-warm-400 mt-0.5">
+                      {detailContact.source === "csv_import" ? "Imported contact" : detailContact.source === "auto_saved" ? "Auto-saved contact" : "Contact"}
+                      {detailContact.lastFollowUpAt && <> &middot; Last follow-up {relativeDate(detailContact.lastFollowUpAt)}</>}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tags row */}
+                {!editing && (detailContact.tags.length > 0 || detailContact.optedOut) && (
+                  <div className="flex flex-wrap gap-1.5 mt-3 ml-[58px]">
+                    {detailContact.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-[10px] bg-teal-50 text-teal-700 border-teal-200">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {detailContact.optedOut && (
+                      <Badge variant="secondary" className="text-[10px] bg-red-50 text-red-600 border-red-200">
+                        Opted Out
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Scrollable content area */}
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                {editing ? (
+                  /* Edit mode — grouped form matching Add Contact style */
+                  <div className="space-y-5">
+                    {/* Name group */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Name</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[13px] font-medium text-warm-600 mb-1.5">First Name *</label>
+                          <Input value={editForm.firstName} onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })} placeholder="First Name" className="rounded-xl h-10 text-[14px]" />
                         </div>
-                        <div className="flex items-center gap-1.5 text-sm text-warm-500 mt-0.5">
-                          <Phone className="w-3.5 h-3.5" />
-                          {detailContact.phone}
+                        <div>
+                          <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Last Name</label>
+                          <Input value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} placeholder="Last Name" className="rounded-xl h-10 text-[14px]" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact info group */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Phone className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Contact Info</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Phone *</label>
+                          <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" className="rounded-xl h-10 text-[14px]" />
+                        </div>
+                        <div>
+                          <label className="block text-[13px] font-medium text-warm-600 mb-1.5">Email</label>
+                          <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="sarah@email.com" className="rounded-xl h-10 text-[14px]" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notes group */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Pencil className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Notes</span>
+                      </div>
+                      <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Any notes about this contact..." className="resize-none rounded-xl text-[14px] min-h-[80px]" />
+                    </div>
+
+                    {/* Tags group */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Tag className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Tags</span>
+                      </div>
+                      <TagInput
+                        tags={editForm.tags}
+                        onChange={(tags) => setEditForm({ ...editForm, tags })}
+                        existingTags={allBusinessTags}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* View mode — grouped sections */
+                  <div className="space-y-5">
+                    {/* Contact Info section */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Phone className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Contact Info</span>
+                      </div>
+                      <div className="bg-warm-50 rounded-xl p-4 space-y-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <Phone className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+                          <span className="text-[14px] text-warm-700">{detailContact.phone}</span>
                         </div>
                         {detailContact.email && (
-                          <div className="flex items-center gap-1.5 text-sm text-warm-500 mt-0.5">
-                            <Mail className="w-3.5 h-3.5" />
-                            {detailContact.email}
+                          <div className="flex items-center gap-2.5">
+                            <Mail className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+                            <span className="text-[14px] text-warm-700">{detailContact.email}</span>
                           </div>
                         )}
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {detailContact.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px] bg-teal-50 text-teal-700 border-teal-200">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {detailContact.optedOut && (
-                            <Badge variant="secondary" className="text-[10px] bg-red-50 text-red-600 border-red-200">
-                              Opted Out
-                            </Badge>
-                          )}
+                      </div>
+                    </div>
+
+                    {/* Notes section */}
+                    {detailContact.notes && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <FileText className="w-3.5 h-3.5 text-warm-400" />
+                          <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Notes</span>
                         </div>
-                      </>
-                    ) : (
-                      <div className="space-y-3">
-                        <Input value={editForm.firstName} onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })} placeholder="First Name" />
-                        <Input value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} placeholder="Last Name" />
-                        <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone" />
-                        <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" />
-                        <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Notes" className="resize-none" />
-                        <div>
-                          <label className="block text-xs font-medium text-warm-500 mb-1">Tags</label>
-                          <TagInput
-                            tags={editForm.tags}
-                            onChange={(tags) => setEditForm({ ...editForm, tags })}
-                            existingTags={allBusinessTags}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
-                          <Button size="sm" onClick={saveEdit} className="bg-teal-600 hover:bg-teal-700 text-white">Save</Button>
+                        <div className="bg-warm-50 rounded-xl p-4">
+                          <p className="text-[14px] text-warm-600 leading-relaxed">{detailContact.notes}</p>
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Notes */}
-                {!editing && detailContact.notes && (
-                  <div className="mb-6 p-3 bg-warm-50 rounded-lg">
-                    <p className="text-xs font-medium text-warm-400 mb-1">Notes</p>
-                    <p className="text-sm text-warm-600">{detailContact.notes}</p>
+                    {/* Stats section */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <BarChart3 className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Stats</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-warm-50 rounded-xl p-4 text-center">
+                          <p className="text-xl font-semibold text-warm-800">{detailContact.totalFollowUps}</p>
+                          <p className="text-xs text-warm-400 mt-0.5">Follow-ups Sent</p>
+                        </div>
+                        <div className="bg-warm-50 rounded-xl p-4 text-center">
+                          {detailContact.hasLeftReview ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                              <span className="text-xl font-semibold text-amber-600">Yes</span>
+                            </div>
+                          ) : (
+                            <p className="text-xl font-semibold text-warm-300">&mdash;</p>
+                          )}
+                          <p className="text-xs text-warm-400 mt-0.5">Review Left</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Follow-up History section */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-3.5 h-3.5 text-warm-400" />
+                        <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Follow-Up History</span>
+                      </div>
+                      {detailContact.followUps.length === 0 ? (
+                        <div className="bg-warm-50 rounded-xl p-4 text-center">
+                          <MessageSquare className="w-5 h-5 text-warm-300 mx-auto mb-1.5" />
+                          <p className="text-[13px] text-warm-400">No follow-ups yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {detailContact.followUps.map((fu) => (
+                            <div key={fu.id} className="flex items-center gap-3 p-3.5 bg-warm-50 rounded-xl">
+                              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                                <Send className="w-3.5 h-3.5 text-teal-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-medium text-warm-700 truncate">{fu.templateName}</p>
+                                <p className="text-[11px] text-warm-400">{relativeDate(fu.createdAt)}</p>
+                              </div>
+                              <Badge
+                                variant="secondary"
+                                className={`text-[10px] ${
+                                  fu.status === "reviewed"
+                                    ? "bg-green-50 text-green-700 border-green-200"
+                                    : fu.status === "opened"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-warm-100 text-warm-500"
+                                }`}
+                              >
+                                {fu.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
+              </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="bg-warm-50 rounded-lg p-3 text-center">
-                    <p className="text-lg font-semibold text-warm-800">{detailContact.totalFollowUps}</p>
-                    <p className="text-xs text-warm-400">Follow-ups</p>
+              {/* Sticky footer */}
+              <div className="px-6 py-4 border-t border-warm-100">
+                {editing ? (
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => setEditing(false)} className="flex-1 rounded-xl h-11 text-[14.5px] font-semibold">
+                      Cancel
+                    </Button>
+                    <Button onClick={saveEdit} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+                      <Check className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </Button>
                   </div>
-                  <div className="bg-warm-50 rounded-lg p-3 text-center">
-                    <p className="text-lg font-semibold text-warm-800">
-                      {detailContact.hasLeftReview ? (
-                        <Star className="w-5 h-5 text-amber-500 mx-auto" />
-                      ) : (
-                        <span className="text-warm-300">--</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-warm-400">Review</p>
-                  </div>
-                </div>
-
-                {/* Follow-up History */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-warm-700 mb-3">Follow-Up History</h4>
-                  {detailContact.followUps.length === 0 ? (
-                    <p className="text-sm text-warm-400">No follow-ups yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {detailContact.followUps.map((fu) => (
-                        <div key={fu.id} className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-warm-700">{fu.templateName}</p>
-                            <p className="text-xs text-warm-400">{relativeDate(fu.createdAt)}</p>
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className={`text-[10px] ${
-                              fu.status === "reviewed"
-                                ? "bg-green-50 text-green-700"
-                                : fu.status === "opened"
-                                ? "bg-blue-50 text-blue-700"
-                                : "bg-warm-100 text-warm-500"
-                            }`}
-                          >
-                            {fu.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Action */}
-                <Link href={`/dashboard/send?contactId=${detailContact.id}`}>
-                  <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white">
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Follow-Up
-                  </Button>
-                </Link>
+                ) : (
+                  <Link href={`/dashboard/send?contactId=${detailContact.id}`} className="block">
+                    <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Follow-Up
+                    </Button>
+                  </Link>
+                )}
               </div>
             </>
           )}
@@ -873,6 +1075,7 @@ function ContactsPage() {
         <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Send Bulk Follow-Up</SheetTitle>
+            <SheetDescription>Send a follow-up to multiple contacts at once</SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-5">
             {!bulkSendResult ? (

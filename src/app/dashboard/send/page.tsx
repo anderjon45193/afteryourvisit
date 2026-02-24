@@ -28,6 +28,8 @@ import Link from "next/link";
 interface Template {
   id: string;
   name: string;
+  smsMessage: string;
+  isDefault?: boolean;
 }
 
 interface Snippet {
@@ -80,7 +82,9 @@ function SendFollowUpPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [templatesError, setTemplatesError] = useState("");
   const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [businessName, setBusinessName] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
 
   // Autocomplete state
@@ -96,16 +100,22 @@ function SendFollowUpPage() {
 
     fetch("/api/templates")
       .then((r) => {
-        if (!r.ok) throw new Error("Failed");
+        if (!r.ok) throw new Error(`Templates failed (${r.status})`);
         return r.json();
       })
       .then((data) => {
         if (!Array.isArray(data)) return;
         setTemplates(data);
+        setTemplatesError("");
         const defaultTpl = data.find((t: Record<string, unknown>) => t.isDefault);
         if (defaultTpl) setTemplateId(defaultTpl.id);
         else if (data.length > 0) setTemplateId(data[0].id);
       })
+      .catch((err) => setTemplatesError(err.message || "Could not load templates"));
+
+    fetch("/api/business")
+      .then((r) => { if (!r.ok) throw new Error("Failed"); return r.json(); })
+      .then((data) => { if (data.name) setBusinessName(data.name); })
       .catch(() => {});
 
     fetch("/api/snippets")
@@ -170,9 +180,12 @@ function SendFollowUpPage() {
     setContactSuggestions([]);
   };
 
-  const canSend = firstName.trim() && phone.replace(/\D/g, "").length === 10 && templateId;
+  const [attempted, setAttempted] = useState(false);
+  const phoneDigits = phone.replace(/\D/g, "").length;
+  const canSend = firstName.trim() && phoneDigits === 10 && templateId;
 
   const handleSend = async () => {
+    setAttempted(true);
     if (!canSend) return;
     setSending(true);
     setError("");
@@ -208,6 +221,7 @@ function SendFollowUpPage() {
     setNotes("");
     setError("");
     setSent(false);
+    setAttempted(false);
     setShowPreview(false);
     setSelectedContact(null);
     setContactSuggestions([]);
@@ -260,21 +274,27 @@ function SendFollowUpPage() {
               <div className="space-y-5">
                 {/* Client name with autocomplete */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="client-name" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Client First Name
                   </label>
                   <Input
+                    id="client-name"
+                    name="client-name"
                     ref={nameRef}
                     type="text"
                     placeholder="Sarah"
+                    autoComplete="given-name"
                     value={firstName}
                     onChange={(e) => handleNameChange(e.target.value)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                     onKeyDown={(e) => {
                       if (e.key === "Escape") setShowSuggestions(false);
                     }}
-                    className="h-12 text-base"
+                    className={`h-12 text-base ${attempted && !firstName.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {attempted && !firstName.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Client name is required</p>
+                  )}
                   {/* Autocomplete dropdown */}
                   {showSuggestions && contactSuggestions.length > 0 && (
                     <div
@@ -321,44 +341,89 @@ function SendFollowUpPage() {
 
                 {/* Phone number */}
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="client-phone" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Phone Number
                   </label>
                   <Input
+                    id="client-phone"
+                    name="client-phone"
                     type="tel"
                     placeholder="(555) 123-4567"
+                    autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(formatPhone(e.target.value))}
-                    className="h-12 text-base"
+                    className={`h-12 text-base ${attempted && phoneDigits !== 10 ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {attempted && phoneDigits === 0 && (
+                    <p className="text-xs text-red-500 mt-1">Phone number is required</p>
+                  )}
+                  {attempted && phoneDigits > 0 && phoneDigits !== 10 && (
+                    <p className="text-xs text-red-500 mt-1">Enter a valid 10-digit phone number</p>
+                  )}
                 </div>
 
                 {/* Template */}
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label id="template-label" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Template
                   </label>
-                  <Select value={templateId} onValueChange={setTemplateId}>
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue placeholder="Select a template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {templatesError ? (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                      <p className="text-sm text-amber-700 mb-2">
+                        {templatesError}. Try refreshing or log out and back in.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTemplatesError("");
+                          fetch("/api/templates")
+                            .then((r) => {
+                              if (!r.ok) throw new Error(`Templates failed (${r.status})`);
+                              return r.json();
+                            })
+                            .then((data) => {
+                              if (!Array.isArray(data)) return;
+                              setTemplates(data);
+                              setTemplatesError("");
+                              const defaultTpl = data.find((t: Record<string, unknown>) => t.isDefault);
+                              if (defaultTpl) setTemplateId(defaultTpl.id);
+                              else if (data.length > 0) setTemplateId(data[0].id);
+                            })
+                            .catch((err) => setTemplatesError(err.message || "Could not load templates"));
+                        }}
+                        className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <Select value={templateId} onValueChange={setTemplateId} name="template">
+                      <SelectTrigger id="template-select" aria-labelledby="template-label" className="h-12 text-base">
+                        <SelectValue placeholder="Select a template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {attempted && !templateId && (
+                    <p className="text-xs text-red-500 mt-1">Please select a template</p>
+                  )}
                 </div>
 
                 {/* Quick notes */}
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
+                  <label htmlFor="quick-notes" className="block text-sm font-medium text-warm-700 mb-1.5">
                     Quick Notes{" "}
                     <span className="text-warm-300 font-normal">(optional)</span>
                   </label>
                   <Textarea
+                    id="quick-notes"
+                    name="quick-notes"
                     placeholder="Add any specific notes for this visit..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -412,9 +477,14 @@ function SendFollowUpPage() {
                           SMS Preview
                         </p>
                         <div className="bg-teal-600 text-white rounded-2xl rounded-bl-md p-3 text-sm max-w-[280px]">
-                          Hi {firstName || "Sarah"}! Thanks for visiting Smile
-                          Dental Care today. Here&apos;s your visit summary:
-                          afteryourvisit.com/v/abc123
+                          {(() => {
+                            const selectedTpl = templates.find((t) => t.id === templateId);
+                            const msg = selectedTpl?.smsMessage || "Hi {{firstName}}! Thanks for visiting {{businessName}} today. Here's your visit summary: {{link}}";
+                            return msg
+                              .replace(/\{\{firstName\}\}/g, firstName || "Sarah")
+                              .replace(/\{\{businessName\}\}/g, businessName || "your business")
+                              .replace(/\{\{link\}\}/g, "afteryourvisit.com/v/...");
+                          })()}
                         </div>
                       </div>
                     </motion.div>
@@ -424,7 +494,7 @@ function SendFollowUpPage() {
                 {/* Send button */}
                 <Button
                   onClick={handleSend}
-                  disabled={!canSend || sending}
+                  disabled={sending}
                   className="w-full h-14 text-base font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-lg"
                 >
                   {sending ? (

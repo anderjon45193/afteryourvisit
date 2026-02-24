@@ -1,6 +1,42 @@
 import { Star } from "lucide-react";
 
-export function PhoneMockup() {
+interface PhoneMockupProps {
+  variant?: "dental" | "vet";
+}
+
+function getRelativeDate(daysAgo: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+const content = {
+  dental: {
+    initials: "SM",
+    business: "Smile Dental Care",
+    greeting: "Thanks for visiting, Sarah!",
+    get date() { return getRelativeDate(1); },
+    notesTitle: "Your Visit Notes",
+    notes: "Routine cleaning completed. No cavities found! Continue flossing daily and brushing 2x per day.",
+    checklistTitle: "Things to Remember",
+    checklist: ["Brush 2x daily", "Floss every evening", "Next visit in 6 months"],
+  },
+  vet: {
+    initials: "HP",
+    business: "Happy Paws Vet Clinic",
+    greeting: "Thanks for bringing Buddy in!",
+    get date() { return getRelativeDate(0); },
+    notesTitle: "Visit Notes",
+    notes: "Annual check-up complete. Buddy is in great health! Vaccinations updated. Weight: 45 lbs (ideal range).",
+    checklistTitle: "Things to Remember",
+    checklist: ["Give heartworm pill monthly", "Next vaccines in 1 year", "Schedule dental cleaning"],
+  },
+};
+
+export function PhoneMockup({ variant = "dental" }: PhoneMockupProps) {
+  const c = content[variant];
+  const accentColor = variant === "vet" ? "teal" : "teal";
+
   return (
     <div className="relative">
       {/* Glow behind phone */}
@@ -17,48 +53,45 @@ export function PhoneMockup() {
             {/* Business logo placeholder */}
             <div className="flex justify-center mb-3">
               <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
-                <span className="text-teal-700 font-bold text-lg">SM</span>
+                <span className="text-teal-700 font-bold text-lg">{c.initials}</span>
               </div>
             </div>
             <p className="text-center text-xs text-warm-500 mb-4">
-              Smile Dental Care
+              {c.business}
             </p>
 
             {/* Divider */}
             <div className="h-px bg-teal-200 mb-4" />
 
             {/* Greeting */}
-            <h3 className="font-[family-name:var(--font-display)] text-lg text-center text-warm-900 mb-1">
-              Thanks for visiting, Sarah!
-            </h3>
+            <p className="font-[family-name:var(--font-display)] text-lg text-center text-warm-900 mb-1">
+              {c.greeting}
+            </p>
             <p className="text-[10px] text-center text-warm-400 mb-4">
-              February 18, 2026
+              {c.date}
             </p>
 
             {/* Visit notes card */}
             <div className="bg-teal-50 rounded-xl p-3 mb-3 border-l-2 border-teal-500">
               <p className="text-[10px] font-semibold text-warm-700 mb-1">
-                Your Visit Notes
+                {c.notesTitle}
               </p>
               <p className="text-[9px] text-warm-600 leading-relaxed">
-                Routine cleaning completed. No cavities found! Continue
-                flossing daily and brushing 2x per day.
+                {c.notes}
               </p>
             </div>
 
             {/* Checklist */}
             <div className="mb-3">
               <p className="text-[10px] font-semibold text-warm-700 mb-2">
-                Things to Remember
+                {c.checklistTitle}
               </p>
-              {["Brush 2x daily", "Floss every evening", "Next visit in 6 months"].map(
-                (item) => (
-                  <div key={item} className="flex items-center gap-2 mb-1.5">
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-teal-400 flex-shrink-0" />
-                    <span className="text-[9px] text-warm-600">{item}</span>
-                  </div>
-                )
-              )}
+              {c.checklist.map((item) => (
+                <div key={item} className="flex items-center gap-2 mb-1.5">
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-teal-400 flex-shrink-0" />
+                  <span className="text-[9px] text-warm-600">{item}</span>
+                </div>
+              ))}
             </div>
 
             {/* Buttons */}

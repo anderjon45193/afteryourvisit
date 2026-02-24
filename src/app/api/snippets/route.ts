@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 // GET /api/snippets — List snippets for this business
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) return NextResponse.json([]);
 
   const snippets = await prisma.snippet.findMany({
     where: { businessId: business!.id },

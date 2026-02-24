@@ -93,12 +93,15 @@ function SignInForm() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1.5">
+              <label htmlFor="signin-email" className="block text-sm font-medium text-warm-700 mb-1.5">
                 Email address
               </label>
               <Input
+                id="signin-email"
+                name="email"
                 type="email"
                 placeholder="you@yourbusiness.com"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -109,7 +112,7 @@ function SignInForm() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium text-warm-700">
+                <label htmlFor="signin-password" className="text-sm font-medium text-warm-700">
                   Password
                 </label>
                 <button
@@ -121,8 +124,11 @@ function SignInForm() {
               </div>
               <div className="relative">
                 <Input
+                  id="signin-password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -161,7 +167,7 @@ function SignInForm() {
           {/* Demo credentials hint */}
           <div className="mt-4 p-3 rounded-lg bg-teal-50 border border-teal-100">
             <p className="text-xs font-medium text-teal-700 mb-1">Demo credentials:</p>
-            <p className="text-xs text-teal-600 font-mono">dr.patel@smiledentalcare.com</p>
+            <p className="text-xs text-teal-600 font-mono">demo@afteryourvisit.com</p>
             <p className="text-xs text-teal-600 font-mono">demo1234</p>
           </div>
         </div>

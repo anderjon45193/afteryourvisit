@@ -6,7 +6,12 @@ import { Prisma } from "@prisma/client";
 // GET /api/contacts — List contacts (paginated, filterable)
 export async function GET(request: NextRequest) {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) {
+    return NextResponse.json({
+      data: [],
+      pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
+    });
+  }
 
   const searchParams = request.nextUrl.searchParams;
   const page = parseInt(searchParams.get("page") || "1");
@@ -68,44 +73,49 @@ export async function GET(request: NextRequest) {
 
 // POST /api/contacts — Create a contact
 export async function POST(request: Request) {
-  const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  try {
+    const { error, business } = await getAuthenticatedBusiness();
+    if (error) return error;
 
-  const body = await request.json();
-  const { firstName, lastName, phone, email, notes, tags } = body;
+    const body = await request.json();
+    const { firstName, lastName, phone, email, notes, tags } = body;
 
-  if (!firstName || !phone) {
-    return NextResponse.json(
-      { error: "firstName and phone are required" },
-      { status: 400 }
-    );
+    if (!firstName || !phone) {
+      return NextResponse.json(
+        { error: "firstName and phone are required" },
+        { status: 400 }
+      );
+    }
+
+    // Check duplicate by phone + businessId (unique constraint)
+    const existing = await prisma.contact.findUnique({
+      where: {
+        phone_businessId: { phone, businessId: business!.id },
+      },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { error: "A contact with this phone number already exists" },
+        { status: 409 }
+      );
+    }
+
+    const contact = await prisma.contact.create({
+      data: {
+        firstName,
+        lastName: lastName || null,
+        phone,
+        email: email || null,
+        tags: tags || [],
+        source: "manual",
+        notes: notes || null,
+        businessId: business!.id,
+      },
+    });
+
+    return NextResponse.json(contact, { status: 201 });
+  } catch (err) {
+    console.error("[POST /api/contacts] Error:", err);
+    return NextResponse.json({ error: "Failed to create contact" }, { status: 500 });
   }
-
-  // Check duplicate by phone + businessId (unique constraint)
-  const existing = await prisma.contact.findUnique({
-    where: {
-      phone_businessId: { phone, businessId: business!.id },
-    },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: "A contact with this phone number already exists" },
-      { status: 409 }
-    );
-  }
-
-  const contact = await prisma.contact.create({
-    data: {
-      firstName,
-      lastName: lastName || null,
-      phone,
-      email: email || null,
-      tags: tags || [],
-      source: "manual",
-      notes: notes || null,
-      businessId: business!.id,
-    },
-  });
-
-  return NextResponse.json(contact, { status: 201 });
 }

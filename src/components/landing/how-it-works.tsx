@@ -46,7 +46,7 @@ export function HowItWorks() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-12 relative">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 relative">
           {/* Connecting line (desktop only) */}
           <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-px bg-gradient-to-r from-teal-200 via-teal-300 to-teal-200" />
 
@@ -55,8 +55,8 @@ export function HowItWorks() {
               key={step.number}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.15 }}
+              viewport={{ once: true, amount: 0.1 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
               className="relative text-center"
             >
               {/* Step number */}

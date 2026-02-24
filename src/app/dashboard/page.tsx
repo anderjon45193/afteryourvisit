@@ -11,7 +11,6 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  Plus,
   Sparkles,
   ArrowRight,
 } from "lucide-react";
@@ -53,9 +52,10 @@ function getGreeting() {
   return "Good evening";
 }
 
-function parseTrend(trend: string): { value: string; up: boolean } {
-  const up = trend.startsWith("+") && trend !== "+0%";
-  return { value: trend, up };
+function parseTrend(trend: string): { value: string; up: boolean; neutral: boolean } {
+  const neutral = trend === "+0%" || trend === "0%" || trend === "-0%";
+  const up = trend.startsWith("+") && !neutral;
+  return { value: trend, up, neutral };
 }
 
 function formatDate(iso: string) {
@@ -71,12 +71,14 @@ function formatDate(iso: string) {
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const userName = session?.user?.name || "there";
+  const userName = session?.user?.name?.split(" ")[0] || "";
 
   const [greeting, setGreeting] = useState("");
   const [today, setToday] = useState("");
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [overviewError, setOverviewError] = useState(false);
   const [recentFollowUps, setRecentFollowUps] = useState<FollowUpItem[]>([]);
+  const [followUpsLoaded, setFollowUpsLoaded] = useState(false);
 
   // Compute date-dependent values only on the client to avoid hydration mismatch
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function DashboardPage() {
         return r.json();
       })
       .then(setOverview)
-      .catch(() => {});
+      .catch(() => setOverviewError(true));
 
     fetch("/api/followups?limit=6")
       .then((r) => {
@@ -106,7 +108,8 @@ export default function DashboardPage() {
         return r.json();
       })
       .then((data) => setRecentFollowUps(data.data || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setFollowUpsLoaded(true));
   }, []);
 
   const stats = overview?.trends
@@ -151,7 +154,7 @@ export default function DashboardPage() {
       {/* Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl text-warm-900">
-          {greeting ? `${greeting}, ` : ""}{userName}
+          {greeting ? `${greeting}${userName ? `, ${userName}` : ""}` : ""}
         </h1>
         <p className="text-warm-400 mt-1">{today}</p>
       </div>
@@ -198,7 +201,7 @@ export default function DashboardPage() {
                       stat.trend.up ? "text-green-600" : "text-warm-400"
                     }`}
                   >
-                    {stat.trend.up ? (
+                    {stat.trend.neutral ? null : stat.trend.up ? (
                       <ArrowUpRight className="w-3 h-3" />
                     ) : (
                       <ArrowDownRight className="w-3 h-3" />
@@ -210,17 +213,36 @@ export default function DashboardPage() {
                 <p className="text-xs text-warm-400 mt-1">{stat.label}</p>
               </motion.div>
             ))
-          : // Loading skeleton
-            Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl p-5 border border-warm-100 shadow-sm animate-pulse"
-              >
-                <div className="w-10 h-10 rounded-lg bg-warm-100 mb-3" />
-                <div className="h-7 bg-warm-100 rounded w-16 mb-2" />
-                <div className="h-3 bg-warm-50 rounded w-24" />
-              </div>
-            ))}
+          : overviewError
+            ? // Error state — show each card label so users know what failed
+              [
+                { label: "Follow-ups Sent", icon: Send, iconBg: "bg-teal-50", iconColor: "text-teal-600" },
+                { label: "Open Rate", icon: Eye, iconBg: "bg-blue-50", iconColor: "text-blue-600" },
+                { label: "Review Clicks", icon: Star, iconBg: "bg-amber-50", iconColor: "text-amber-600" },
+                { label: "Review Rate", icon: TrendingUp, iconBg: "bg-green-50", iconColor: "text-green-600" },
+              ].map((card) => (
+                <div
+                  key={card.label}
+                  className="bg-white rounded-xl p-5 border border-warm-100 shadow-sm"
+                >
+                  <div className={`w-10 h-10 rounded-lg ${card.iconBg} flex items-center justify-center mb-3`}>
+                    <card.icon className={`w-5 h-5 ${card.iconColor}`} />
+                  </div>
+                  <p className="text-2xl font-bold text-warm-300">—</p>
+                  <p className="text-xs text-warm-400 mt-1">{card.label}</p>
+                </div>
+              ))
+            : // Loading skeleton
+              Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl p-5 border border-warm-100 shadow-sm animate-pulse"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-warm-100 mb-3" />
+                  <div className="h-7 bg-warm-100 rounded w-16 mb-2" />
+                  <div className="h-3 bg-warm-50 rounded w-24" />
+                </div>
+              ))}
       </div>
 
       {/* Recent Follow-Ups */}
@@ -238,7 +260,7 @@ export default function DashboardPage() {
 
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Recent follow-ups">
             <thead>
               <tr className="border-b border-warm-50">
                 <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">
@@ -326,7 +348,7 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {recentFollowUps.length === 0 && (
+        {recentFollowUps.length === 0 && followUpsLoaded && (
           <div className="p-12 text-center">
             <Send className="w-8 h-8 text-warm-200 mx-auto mb-3" />
             <p className="text-warm-400 text-sm">No follow-ups yet.</p>
@@ -339,16 +361,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <Link href="/dashboard/send" className="fixed bottom-20 lg:bottom-8 right-6 z-30">
-        <Button
-          size="lg"
-          className="bg-teal-600 hover:bg-teal-700 text-white rounded-full shadow-xl hover:shadow-2xl px-6 py-6 text-sm font-semibold hover:-translate-y-0.5 transition-all"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          New Follow-Up
-        </Button>
-      </Link>
     </>
   );
 }

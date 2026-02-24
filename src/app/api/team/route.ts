@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 // GET /api/team — List team members for business
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) return NextResponse.json([]);
 
   const members = await prisma.user.findMany({
     where: { businessId: business!.id },

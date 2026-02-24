@@ -5,7 +5,16 @@ import { prisma } from "@/lib/db";
 // GET /api/analytics/overview — Dashboard stats
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) {
+    return NextResponse.json({
+      totalSent: 0,
+      openRate: 0,
+      reviewClicks: 0,
+      reviewRate: 0,
+      bookingClicks: 0,
+      trends: { sent: "0%", openRate: "0%", reviewClicks: "0%", reviews: "0%" },
+    });
+  }
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

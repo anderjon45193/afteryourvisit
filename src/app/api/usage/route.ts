@@ -5,7 +5,16 @@ import { getPlanLimits, PLANS } from "@/lib/stripe";
 
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) {
+    // Return default usage so the sidebar/dashboard isn't broken
+    return NextResponse.json({
+      plan: "starter",
+      planName: "Starter",
+      followUps: { used: 0, limit: 200, remaining: 200 },
+      isTrialExpired: false,
+      trialDaysLeft: null,
+    });
+  }
 
   const biz = business!;
   const limits = getPlanLimits(biz.plan);

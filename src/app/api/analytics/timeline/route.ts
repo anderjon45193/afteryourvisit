@@ -5,7 +5,23 @@ import { prisma } from "@/lib/db";
 // GET /api/analytics/timeline — Time-series data for charts
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) {
+    // Return empty 7-day timeline so charts render
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const timeline = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      timeline.push({
+        date: d.toISOString().split("T")[0],
+        day: dayNames[d.getDay()],
+        sent: 0,
+        opened: 0,
+        reviewed: 0,
+      });
+    }
+    return NextResponse.json(timeline);
+  }
 
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

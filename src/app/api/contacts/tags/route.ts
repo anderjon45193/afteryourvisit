@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 // GET /api/contacts/tags — Get all unique tags for the business
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) return NextResponse.json({ tags: [] });
 
   const contacts = await prisma.contact.findMany({
     where: { businessId: business!.id },

@@ -6,7 +6,7 @@ import { getPlanLimits } from "@/lib/stripe";
 // GET /api/locations — List locations for business
 export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) return NextResponse.json([]);
 
   const locations = await prisma.location.findMany({
     where: { businessId: business!.id },

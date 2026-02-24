@@ -27,8 +27,8 @@ export function Hero() {
               Every visit deserves a follow-up.
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-warm-500 max-w-xl leading-relaxed">
-              Send beautiful, branded follow-up texts that your clients love — and
-              that generate 5-star Google reviews on autopilot.
+              Turn every appointment into a 5-star Google review — automatically.
+              Send branded follow-up texts your clients actually love.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               <Link href="/sign-up">
@@ -43,7 +43,7 @@ export function Hero() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="px-8 py-6 text-base border-warm-300 text-warm-700 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50"
+                  className="px-8 py-6 text-base font-semibold border-warm-300 text-warm-700 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 bg-white/60"
                 >
                   See How It Works
                 </Button>

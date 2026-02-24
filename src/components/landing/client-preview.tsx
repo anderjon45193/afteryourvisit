@@ -30,7 +30,7 @@ export function ClientPreview() {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="flex justify-center"
         >
-          <PhoneMockup />
+          <PhoneMockup variant="vet" />
         </motion.div>
       </div>
     </section>

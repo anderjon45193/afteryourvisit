@@ -47,9 +47,14 @@ export function FinalCta() {
             }}
             className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
           >
+            <label htmlFor="cta-email" className="sr-only">
+              Email address
+            </label>
             <Input
+              id="cta-email"
               type="email"
               placeholder="Enter your email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="bg-white/10 border-white/20 text-white placeholder:text-teal-300 h-12 flex-1"
@@ -58,7 +63,7 @@ export function FinalCta() {
             <Button
               type="submit"
               size="lg"
-              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold h-12 px-6 shadow-lg"
+              className="bg-white hover:bg-warm-50 text-teal-800 font-semibold h-12 px-6 shadow-lg"
             >
               Start Free Trial
               <ArrowRight className="w-4 h-4 ml-2" />

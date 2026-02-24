@@ -74,30 +74,40 @@ export default function WelcomePage() {
   const [sendError, setSendError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Fetch business + templates on mount
+  // Fetch business + templates on mount (with retry for fresh sessions)
   useEffect(() => {
-    Promise.all([
-      fetch("/api/business").then((r) => {
-        if (!r.ok) throw new Error("Failed");
-        return r.json();
-      }),
-      fetch("/api/templates").then((r) => {
-        if (!r.ok) throw new Error("Failed");
-        return r.json();
-      }),
-    ])
-      .then(([bizData, tplData]) => {
-        if (bizData?.name) setBusiness(bizData);
-        if (Array.isArray(tplData)) setTemplates(tplData);
-        // Pre-fill phone from business
-        if (bizData.phone) setPhone(bizData.phone);
-        // Select default template
-        const defaultTpl = tplData.find((t: Template) => t.isDefault);
-        if (defaultTpl) setSelectedTemplateId(defaultTpl.id);
-        else if (tplData.length > 0) setSelectedTemplateId(tplData[0].id);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let retryCount = 0;
+
+    function loadData() {
+      Promise.all([
+        fetch("/api/business").then((r) => {
+          if (!r.ok) throw new Error("Failed");
+          return r.json();
+        }),
+        fetch("/api/templates").then((r) => {
+          if (!r.ok) throw new Error("Failed");
+          return r.json();
+        }),
+      ])
+        .then(([bizData, tplData]) => {
+          // Retry if session not ready yet (empty placeholder)
+          if (bizData?._empty && retryCount < 3) {
+            retryCount++;
+            setTimeout(loadData, 1000);
+            return;
+          }
+          if (bizData?.name) setBusiness(bizData);
+          if (Array.isArray(tplData)) setTemplates(tplData);
+          if (bizData.phone) setPhone(bizData.phone);
+          const defaultTpl = tplData.find((t: Template) => t.isDefault);
+          if (defaultTpl) setSelectedTemplateId(defaultTpl.id);
+          else if (tplData.length > 0) setSelectedTemplateId(tplData[0].id);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+
+    loadData();
   }, []);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);

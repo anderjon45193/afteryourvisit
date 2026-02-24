@@ -293,6 +293,8 @@ export default function TemplatesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorState>({ ...EMPTY_EDITOR });
   const [saving, setSaving] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // ─── Fetch templates ─────────────────────────────────
@@ -334,12 +336,16 @@ export default function TemplatesPage() {
     setEditorMode("create");
     setEditingId(null);
     setEditor({ ...EMPTY_EDITOR });
+    setSaveAttempted(false);
+    setSaveError("");
     setSheetOpen(true);
   }
 
   function openEdit(tpl: Template) {
     setEditorMode("edit");
     setEditingId(tpl.id);
+    setSaveAttempted(false);
+    setSaveError("");
     setEditor({
       name: tpl.name,
       smsMessage: tpl.smsMessage,
@@ -355,6 +361,8 @@ export default function TemplatesPage() {
   function openDuplicate(tpl: Template) {
     setEditorMode("duplicate");
     setEditingId(null);
+    setSaveAttempted(false);
+    setSaveError("");
     setEditor({
       name: `${tpl.name} (Copy)`,
       smsMessage: tpl.smsMessage,
@@ -393,6 +401,7 @@ export default function TemplatesPage() {
   // ─── Save (create or update) ─────────────────────────
 
   async function handleSave() {
+    setSaveAttempted(true);
     if (!editor.name.trim() || !editor.smsMessage.trim() || !editor.pageHeading.trim()) return;
 
     setSaving(true);
@@ -413,20 +422,28 @@ export default function TemplatesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error("Failed to update");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to update (${res.status})`);
+        }
       } else {
         const res = await fetch("/api/templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error("Failed to create");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to create (${res.status})`);
+        }
       }
 
       setSheetOpen(false);
+      setSaveError("");
       fetchTemplates();
-    } catch {
-      // Error silently handled — could add toast in the future
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save template.";
+      setSaveError(message.includes("Unauthorized") ? "Please sign in again to save templates." : `Failed to save template: ${message}`);
     } finally {
       setSaving(false);
     }
@@ -434,14 +451,18 @@ export default function TemplatesPage() {
 
   // ─── Delete ──────────────────────────────────────────
 
+  const [deleteError, setDeleteError] = useState("");
+
   async function handleDelete(id: string) {
+    setDeleteError("");
     try {
       const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       setDeleteConfirm(null);
       fetchTemplates();
     } catch {
-      // Could add toast
+      setDeleteError("Failed to delete template. Please try again.");
+      setDeleteConfirm(null);
     }
   }
 
@@ -507,6 +528,13 @@ export default function TemplatesPage() {
             <Plus className="w-4 h-4 mr-2" />
             Create Template
           </Button>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700 flex items-center justify-between">
+          {deleteError}
+          <button onClick={() => setDeleteError("")} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -640,6 +668,12 @@ export default function TemplatesPage() {
             </SheetDescription>
           </SheetHeader>
 
+          {saveError && (
+            <div className="mx-6 mb-2 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">
+              {saveError}
+            </div>
+          )}
+
           {/* Mobile toggle */}
           <div className="sm:hidden flex gap-2 px-6 pb-2">
             <button
@@ -677,8 +711,11 @@ export default function TemplatesPage() {
                       setEditor({ ...editor, name: e.target.value })
                     }
                     placeholder="e.g. Standard Cleaning"
-                    className="text-sm"
+                    className={`text-sm ${saveAttempted && !editor.name.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {saveAttempted && !editor.name.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Template name is required</p>
+                  )}
                 </div>
 
                 {/* SMS Message */}
@@ -692,8 +729,11 @@ export default function TemplatesPage() {
                       setEditor({ ...editor, smsMessage: e.target.value })
                     }
                     placeholder="Hi {{firstName}}! ..."
-                    className="text-sm min-h-[80px]"
+                    className={`text-sm min-h-[80px] ${saveAttempted && !editor.smsMessage.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {saveAttempted && !editor.smsMessage.trim() && (
+                    <p className="text-xs text-red-500 mt-1">SMS message is required</p>
+                  )}
                   <p className="text-[11px] text-warm-400 mt-1">
                     Variables: {"{{firstName}}"}, {"{{businessName}}"},{" "}
                     {"{{link}}"}
@@ -711,8 +751,11 @@ export default function TemplatesPage() {
                       setEditor({ ...editor, pageHeading: e.target.value })
                     }
                     placeholder="Thanks for visiting, {{firstName}}!"
-                    className="text-sm"
+                    className={`text-sm ${saveAttempted && !editor.pageHeading.trim() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
                   />
+                  {saveAttempted && !editor.pageHeading.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Page heading is required</p>
+                  )}
                 </div>
 
                 {/* Page Subheading */}
@@ -827,7 +870,7 @@ export default function TemplatesPage() {
             </Button>
             <Button
               className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={!canSave || saving}
+              disabled={saving}
               onClick={handleSave}
             >
               {saving ? (

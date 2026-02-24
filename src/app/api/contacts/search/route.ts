@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 // GET /api/contacts/search?q=... — Autocomplete search (top 5)
 export async function GET(request: NextRequest) {
   const { error, business } = await getAuthenticatedBusiness();
-  if (error) return error;
+  if (error) return NextResponse.json([]);
 
   const q = request.nextUrl.searchParams.get("q") || "";
   if (q.length < 1) {

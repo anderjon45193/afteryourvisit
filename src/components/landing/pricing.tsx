@@ -69,10 +69,12 @@ const plans = [
 export function Pricing() {
   const [annual, setAnnual] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
   const { data: session } = useSession();
 
   const handleCheckout = async (planId: string) => {
     setCheckoutLoading(planId);
+    setCheckoutError("");
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -82,9 +84,11 @@ export function Pricing() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setCheckoutError("Could not start checkout. Please try signing in first.");
       }
     } catch {
-      // Checkout failed
+      setCheckoutError("Could not start checkout. Please try again.");
     } finally {
       setCheckoutLoading(null);
     }
@@ -133,7 +137,13 @@ export function Pricing() {
           </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+        {checkoutError && (
+          <div className="max-w-5xl mx-auto mb-6 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700 text-center">
+            {checkoutError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
@@ -161,10 +171,22 @@ export function Pricing() {
               <p className="text-sm text-warm-500 mt-1">{plan.description}</p>
 
               <div className="mt-6 mb-6">
-                <span className="text-4xl font-bold text-warm-900">
-                  ${annual ? plan.annualPrice : plan.monthlyPrice}
-                </span>
-                <span className="text-warm-400 ml-1">/month</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold text-warm-900">
+                    ${annual ? plan.annualPrice : plan.monthlyPrice}
+                  </span>
+                  <span className="text-warm-400">/month</span>
+                  {annual && (
+                    <span className="text-lg text-warm-400 line-through">
+                      ${plan.monthlyPrice}
+                    </span>
+                  )}
+                </div>
+                {annual && (
+                  <p className="text-xs text-green-600 font-medium mt-1">
+                    Save ${(plan.monthlyPrice - plan.annualPrice) * 12}/year
+                  </p>
+                )}
               </div>
 
               {session ? (
@@ -174,6 +196,8 @@ export function Pricing() {
                   className={`w-full py-5 text-base font-semibold ${
                     plan.popular
                       ? "bg-teal-600 hover:bg-teal-700 text-white"
+                      : plan.id === "pro"
+                      ? "bg-warm-800 hover:bg-warm-900 text-white"
                       : "bg-warm-100 hover:bg-warm-200 text-warm-700"
                   }`}
                 >
@@ -183,11 +207,13 @@ export function Pricing() {
                   {plan.cta}
                 </Button>
               ) : (
-                <Link href="/sign-up">
+                <Link href="/sign-up" className="block">
                   <Button
                     className={`w-full py-5 text-base font-semibold ${
                       plan.popular
                         ? "bg-teal-600 hover:bg-teal-700 text-white"
+                        : plan.id === "pro"
+                        ? "bg-warm-800 hover:bg-warm-900 text-white"
                         : "bg-warm-100 hover:bg-warm-200 text-warm-700"
                     }`}
                   >
@@ -207,6 +233,10 @@ export function Pricing() {
             </motion.div>
           ))}
         </div>
+
+        <p className="text-center text-sm text-warm-400 mt-8">
+          Cancel anytime. No contracts. No setup fees. All plans include a 14-day free trial.
+        </p>
       </div>
     </section>
   );
