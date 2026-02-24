@@ -21,6 +21,15 @@ export const metadata: Metadata = {
     description:
       "Send beautiful follow-up texts after every appointment. Generate Google reviews on autopilot.",
     url: "https://afteryourvisit.com",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "AfterYourVisit — Smart Follow-Up Texts for Local Businesses",
+      },
+    ],
   },
 };
 

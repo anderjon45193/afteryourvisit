@@ -192,7 +192,7 @@ function ContactsPage() {
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "", tags: [] as string[] });
 
   // Add contact form
-  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", email: "", notes: "", tags: [] as string[] });
   const [addError, setAddError] = useState("");
   const [addAttempted, setAddAttempted] = useState(false);
 
@@ -380,6 +380,7 @@ function ContactsPage() {
           phone: addForm.phone.trim(),
           email: addForm.email.trim() || null,
           notes: addForm.notes.trim() || null,
+          tags: addForm.tags.length > 0 ? addForm.tags : [],
         }),
       });
       if (!res.ok) {
@@ -389,7 +390,7 @@ function ContactsPage() {
         return;
       }
       setShowAddSheet(false);
-      setAddForm({ firstName: "", lastName: "", phone: "", email: "", notes: "" });
+      setAddForm({ firstName: "", lastName: "", phone: "", email: "", notes: "", tags: [] });
       setAddAttempted(false);
       fetchContacts();
     } catch {
@@ -676,12 +677,25 @@ function ContactsPage() {
                 </div>
                 <Textarea value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} placeholder="Any notes about this contact..." className="resize-none rounded-xl text-[14px] min-h-[80px]" />
               </div>
+
+              {/* Tags group */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="w-3.5 h-3.5 text-warm-400" />
+                  <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Tags</span>
+                </div>
+                <TagInput
+                  tags={addForm.tags}
+                  onChange={(tags) => setAddForm({ ...addForm, tags })}
+                  existingTags={allBusinessTags}
+                />
+              </div>
             </div>
           </div>
 
           {/* Sticky footer */}
           <div className="px-6 py-4 border-t border-warm-100">
-            <Button onClick={handleAdd} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+            <Button type="button" onClick={handleAdd} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
               <Plus className="w-4 h-4 mr-2" />
               Save Contact
             </Button>

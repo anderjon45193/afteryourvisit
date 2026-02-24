@@ -80,7 +80,7 @@ export default function FollowUpsPage() {
         <div>
           <h1 className="text-2xl text-warm-900">Follow-Ups</h1>
           <p className="text-sm text-warm-400 mt-1">
-            {pagination.total} follow-ups sent
+            {pagination.total} follow-up{pagination.total !== 1 ? "s" : ""} sent
           </p>
         </div>
         <Link href="/dashboard/send">

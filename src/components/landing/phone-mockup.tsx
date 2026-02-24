@@ -42,8 +42,8 @@ export function PhoneMockup({ variant = "dental" }: PhoneMockupProps) {
       {/* Glow behind phone */}
       <div className="absolute inset-0 bg-teal-200/20 rounded-[3rem] blur-2xl scale-110" />
 
-      {/* Phone frame */}
-      <div className="relative w-[280px] sm:w-[320px] bg-warm-900 rounded-[2.5rem] p-3 shadow-2xl">
+      {/* Phone frame — decorative mockup, hidden from assistive technology */}
+      <div aria-hidden="true" className="relative w-[280px] sm:w-[320px] bg-warm-900 rounded-[2.5rem] p-3 shadow-2xl">
         {/* Notch */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-warm-900 rounded-b-2xl z-10" />
 
@@ -95,13 +95,13 @@ export function PhoneMockup({ variant = "dental" }: PhoneMockupProps) {
             </div>
 
             {/* Buttons */}
-            <button className="w-full py-2 px-3 rounded-lg border border-warm-200 text-[10px] font-medium text-warm-700 mb-2">
+            <div className="w-full py-2 px-3 rounded-lg border border-warm-200 text-[10px] font-medium text-warm-700 mb-2 text-center">
               Book Your Next Visit
-            </button>
-            <button className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-[10px] font-bold text-white flex items-center justify-center gap-1.5 shadow-md">
+            </div>
+            <div className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-[10px] font-bold text-white flex items-center justify-center gap-1.5 shadow-md">
               <Star className="w-3 h-3 fill-white" />
               Leave Us a Review
-            </button>
+            </div>
             <p className="text-[8px] text-center text-warm-400 mt-1.5">
               It only takes 30 seconds
             </p>

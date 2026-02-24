@@ -58,6 +58,7 @@ function FaqItem({
   index: number;
 }) {
   const [open, setOpen] = useState(false);
+  const answerId = `faq-answer-${index}`;
 
   return (
     <motion.div
@@ -71,6 +72,7 @@ function FaqItem({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-warm-50 transition-colors"
         aria-expanded={open}
+        aria-controls={answerId}
       >
         <span className="font-semibold text-warm-900 pr-4">{faq.question}</span>
         <ChevronDown
@@ -80,6 +82,8 @@ function FaqItem({
         />
       </button>
       <div
+        id={answerId}
+        role="region"
         className={`overflow-hidden transition-all duration-300 ${
           open ? "max-h-96" : "max-h-0"
         }`}
