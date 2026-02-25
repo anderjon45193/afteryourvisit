@@ -103,6 +103,7 @@ function SettingsContent() {
   const [profileError, setProfileError] = useState("");
   const [profileValidation, setProfileValidation] = useState<Record<string, string>>({});
   const [autoBrandLoading, setAutoBrandLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const isValidUrl = (url: string) => !url.trim() || /^https?:\/\/.+\..+/.test(url.trim());
   const isValidHex = (hex: string) => /^#[0-9a-fA-F]{6}$/.test(hex);
@@ -315,6 +316,45 @@ function SettingsContent() {
 
   const updateProfile = (field: keyof ProfileForm, value: string) => {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+    if (!allowedTypes.includes(file.type)) {
+      setProfileError("Invalid file type. Allowed: PNG, JPG, WebP, SVG");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileError("File too large. Maximum size is 2MB.");
+      return;
+    }
+
+    setLogoUploading(true);
+    setProfileError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/business/logo", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.logoUrl) {
+        setProfileForm((prev) => ({ ...prev, logoUrl: data.logoUrl }));
+      } else {
+        setProfileError(data.error || "Failed to upload logo");
+      }
+    } catch {
+      setProfileError("Failed to upload logo");
+    } finally {
+      setLogoUploading(false);
+      // Reset the input so re-selecting the same file triggers onChange
+      e.target.value = "";
+    }
   };
 
   // ── Location handlers ──────────────────────────────────
@@ -549,11 +589,30 @@ function SettingsContent() {
                     )}
                   </div>
                   <div>
-                    <Button variant="outline" size="sm">
-                      Upload Logo
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={logoUploading}
+                      onClick={() => document.getElementById("logo-upload")?.click()}
+                    >
+                      {logoUploading ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        "Upload Logo"
+                      )}
                     </Button>
                     <p className="text-xs text-warm-400 mt-1">
-                      PNG, JPG up to 2MB
+                      PNG, JPG, WebP, SVG up to 2MB
                     </p>
                   </div>
                 </div>

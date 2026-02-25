@@ -3,8 +3,12 @@ import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { sendFollowUpSMS, normalizePhone } from "@/lib/twilio";
 import { checkCanSendFollowUp } from "@/lib/plan-limits";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const rateLimited = rateLimit(request, RATE_LIMITS.smsBulk, "sms-bulk");
+  if (rateLimited) return rateLimited;
+
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return error;
 

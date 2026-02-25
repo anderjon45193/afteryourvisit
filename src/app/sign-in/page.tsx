@@ -115,12 +115,12 @@ function SignInForm() {
                 <label htmlFor="signin-password" className="text-sm font-medium text-warm-700">
                   Password
                 </label>
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="text-xs text-teal-600 hover:text-teal-700"
                 >
                   Forgot password?
-                </button>
+                </Link>
               </div>
               <div className="relative">
                 <Input

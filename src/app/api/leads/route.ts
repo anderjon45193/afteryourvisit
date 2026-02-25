@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 // POST /api/leads — Capture email from landing page CTA
 export async function POST(request: Request) {
+  const rateLimited = rateLimit(request, RATE_LIMITS.leads, "leads");
+  if (rateLimited) return rateLimited;
+
   const body = await request.json();
   const { email } = body;
 

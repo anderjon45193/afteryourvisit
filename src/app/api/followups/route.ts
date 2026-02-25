@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { sendFollowUpSMS, normalizePhone } from "@/lib/twilio";
 import { checkCanSendFollowUp } from "@/lib/plan-limits";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 
 // GET /api/followups — List follow-ups (paginated, filterable)
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/followups — Create & send a follow-up
 export async function POST(request: Request) {
+  const rateLimited = rateLimit(request, RATE_LIMITS.smsSend, "sms");
+  if (rateLimited) return rateLimited;
+
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return error;
 
