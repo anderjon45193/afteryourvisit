@@ -1217,28 +1217,58 @@ function ContactsPage() {
     const selectedTemplate = templates.find((t) => t.id === bulkSendTemplateId);
     return (
       <Sheet open={showBulkSend} onOpenChange={(open) => { if (!open) closeBulkSend(); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="sr-only">
             <SheetTitle>Send Bulk Follow-Up</SheetTitle>
             <SheetDescription>Send a follow-up to multiple contacts at once</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-5">
+
+          {/* Branded header */}
+          <div className="px-6 pt-7 pb-5 border-b border-warm-100">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                <Send className="w-[18px] h-[18px] text-teal-600" />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-warm-800">Bulk Follow-Up</h3>
+                <p className="text-xs text-warm-400 mt-0.5">
+                  {bulkSendResult
+                    ? bulkSendResult.errorMessage ? "There was a problem sending" : "Your follow-ups have been sent"
+                    : `Send to ${selectedIds.size} selected contact${selectedIds.size !== 1 ? "s" : ""}`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
             {!bulkSendResult ? (
-              <>
-                <div className="p-3 bg-teal-50 rounded-lg border border-teal-100">
-                  <p className="text-sm text-teal-800">
+              <div className="space-y-5">
+                {/* Summary badge */}
+                <div className="flex items-center gap-3 p-3.5 bg-teal-50 rounded-xl border border-teal-100">
+                  <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-4 h-4 text-teal-700" />
+                  </div>
+                  <p className="text-[13px] text-teal-800">
                     Send follow-up to <span className="font-semibold">{selectedIds.size}</span> contact{selectedIds.size !== 1 ? "s" : ""}
-                    {selectedTemplate ? ` using "${selectedTemplate.name}"` : ""}
+                    {selectedTemplate ? <> using <span className="font-semibold">&ldquo;{selectedTemplate.name}&rdquo;</span></> : ""}
                   </p>
                 </div>
 
+                {/* Template group */}
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">Template</label>
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Template</span>
+                  </div>
                   {templates.length === 0 ? (
-                    <p className="text-sm text-warm-400">Loading templates...</p>
+                    <div className="flex items-center gap-2 text-[13px] text-warm-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Loading templates...
+                    </div>
                   ) : (
                     <Select value={bulkSendTemplateId} onValueChange={setBulkSendTemplateId}>
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-xl h-10 text-[14px]">
                         <SelectValue placeholder="Select a template" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1252,80 +1282,118 @@ function ContactsPage() {
                   )}
                 </div>
 
+                {/* Notes group */}
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1.5">
-                    Notes <span className="text-warm-400 font-normal">(optional)</span>
-                  </label>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Pencil className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Notes</span>
+                    <span className="text-[11px] text-warm-400 font-normal normal-case ml-auto">Optional</span>
+                  </div>
                   <Textarea
                     value={bulkSendNotes}
                     onChange={(e) => setBulkSendNotes(e.target.value)}
                     placeholder="Custom notes for all follow-ups..."
-                    className="resize-none"
+                    className="resize-none rounded-xl text-[14px] min-h-[80px]"
                     rows={3}
                   />
                 </div>
-
-                <Button
-                  onClick={handleBulkSend}
-                  disabled={bulkSending || !bulkSendTemplateId}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white"
-                >
-                  {bulkSending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send to {selectedIds.size} Contact{selectedIds.size !== 1 ? "s" : ""}
-                    </>
-                  )}
-                </Button>
-              </>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
+                {/* Result banner */}
                 {bulkSendResult.errorMessage ? (
-                  <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl border border-red-100">
-                    <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                  <div className="flex items-center gap-3.5 p-4 bg-red-50 rounded-xl border border-red-100">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    </div>
                     <div>
-                      <p className="font-medium text-red-800">Cannot Send</p>
-                      <p className="text-sm text-red-600">{bulkSendResult.errorMessage}</p>
+                      <p className="text-[14px] font-semibold text-red-800">Cannot Send</p>
+                      <p className="text-[13px] text-red-600 mt-0.5">{bulkSendResult.errorMessage}</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
-                    <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
+                  <div className="flex items-center gap-3.5 p-4 bg-green-50 rounded-xl border border-green-100">
+                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-5 h-5 text-green-600" />
+                    </div>
                     <div>
-                      <p className="font-medium text-green-800">Bulk Send Complete</p>
-                      <p className="text-sm text-green-600">
-                        {bulkSendResult.sent} sent
-                        {bulkSendResult.failed > 0 && `, ${bulkSendResult.failed} failed`}
-                        {bulkSendResult.skippedOptOut > 0 && `, ${bulkSendResult.skippedOptOut} skipped (opted out)`}
+                      <p className="text-[14px] font-semibold text-green-800">Bulk Send Complete</p>
+                      <p className="text-[13px] text-green-600 mt-0.5">
+                        Your follow-ups are on their way.
                       </p>
                     </div>
                   </div>
                 )}
+
+                {/* Stats */}
+                {!bulkSendResult.errorMessage && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <BarChart3 className="w-3.5 h-3.5 text-warm-400" />
+                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Results</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-teal-50 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-teal-700">{bulkSendResult.sent}</p>
+                        <p className="text-[11px] text-teal-600 font-medium">Sent</p>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center ${bulkSendResult.skippedOptOut > 0 ? "bg-amber-50" : "bg-warm-50"}`}>
+                        <p className={`text-lg font-bold ${bulkSendResult.skippedOptOut > 0 ? "text-amber-600" : "text-warm-500"}`}>{bulkSendResult.skippedOptOut}</p>
+                        <p className={`text-[11px] font-medium ${bulkSendResult.skippedOptOut > 0 ? "text-amber-600" : "text-warm-500"}`}>Opted Out</p>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center ${bulkSendResult.failed > 0 ? "bg-red-50" : "bg-warm-50"}`}>
+                        <p className={`text-lg font-bold ${bulkSendResult.failed > 0 ? "text-red-600" : "text-warm-500"}`}>{bulkSendResult.failed}</p>
+                        <p className={`text-[11px] font-medium ${bulkSendResult.failed > 0 ? "text-red-600" : "text-warm-500"}`}>Failed</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {bulkSendResult.skippedOptOut > 0 && (
-                  <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
                     <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-amber-700">
+                    <p className="text-[13px] text-amber-700">
                       {bulkSendResult.skippedOptOut} contact{bulkSendResult.skippedOptOut !== 1 ? "s were" : " was"} skipped because they opted out of messages.
                     </p>
                   </div>
                 )}
                 {bulkSendResult.failed > 0 && (
-                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-100">
                     <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-red-700">
+                    <p className="text-[13px] text-red-700">
                       {bulkSendResult.failed} follow-up{bulkSendResult.failed !== 1 ? "s" : ""} failed to send. Check your SMS settings.
                     </p>
                   </div>
                 )}
-                <Button onClick={closeBulkSend} className="w-full bg-teal-600 hover:bg-teal-700 text-white">
-                  Done
-                </Button>
               </div>
+            )}
+          </div>
+
+          {/* Sticky footer */}
+          <div className="px-6 py-4 border-t border-warm-100">
+            {!bulkSendResult ? (
+              <Button
+                onClick={handleBulkSend}
+                disabled={bulkSending || !bulkSendTemplateId}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold"
+              >
+                {bulkSending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Send to {selectedIds.size} Contact{selectedIds.size !== 1 ? "s" : ""}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button onClick={closeBulkSend} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+                <Users className="w-4 h-4 mr-2" />
+                Done
+              </Button>
             )}
           </div>
         </SheetContent>
