@@ -708,66 +708,159 @@ function ContactsPage() {
   function renderImportSheet() {
     return (
       <Sheet open={showImportSheet} onOpenChange={(open) => { if (!open) closeImport(); }}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
+          <SheetHeader className="sr-only">
             <SheetTitle>Import Contacts</SheetTitle>
             <SheetDescription>Upload a CSV file to import contacts in bulk</SheetDescription>
           </SheetHeader>
-          <div className="mt-6">
+
+          {/* Branded header */}
+          <div className="px-6 pt-7 pb-5 border-b border-warm-100">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                <FileSpreadsheet className="w-[18px] h-[18px] text-teal-600" />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-warm-800">Import Contacts</h3>
+                <p className="text-xs text-warm-400 mt-0.5">
+                  {importStep === 1 && "Upload a CSV file to import contacts in bulk"}
+                  {importStep === 2 && `${csvFileName} — Map columns to fields`}
+                  {importStep === 3 && "Processing your import..."}
+                  {importStep === 4 && "Your import is complete"}
+                </p>
+              </div>
+            </div>
+
+            {/* Step indicator */}
+            {importStep < 4 && (
+              <div className="flex items-center gap-2 mt-4 ml-[54px]">
+                {[1, 2, 3].map((step) => (
+                  <div key={step} className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold transition-colors ${
+                      importStep > step ? "bg-teal-600 text-white" :
+                      importStep === step ? "bg-teal-600 text-white" :
+                      "bg-warm-100 text-warm-400"
+                    }`}>
+                      {importStep > step ? <Check className="w-3 h-3" /> : step}
+                    </div>
+                    {step < 3 && (
+                      <div className={`w-8 h-0.5 rounded-full transition-colors ${importStep > step ? "bg-teal-600" : "bg-warm-100"}`} />
+                    )}
+                  </div>
+                ))}
+                <span className="text-[11px] text-warm-400 ml-1">
+                  {importStep === 1 && "Upload"}
+                  {importStep === 2 && "Map Columns"}
+                  {importStep === 3 && "Importing"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
             {importStep === 1 && (
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-warm-200 rounded-xl p-8 text-center">
-                  <FileSpreadsheet className="w-10 h-10 text-warm-300 mx-auto mb-3" />
-                  <p className="text-sm text-warm-500 mb-3">Upload a CSV file with your contacts</p>
-                  <label className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors">
-                    <Upload className="w-4 h-4" />
-                    Choose File
+              <div className="space-y-5">
+                {/* Upload section */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Upload className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">File Upload</span>
+                  </div>
+                  <label className="block border-2 border-dashed border-warm-200 rounded-xl p-8 text-center cursor-pointer hover:border-teal-300 hover:bg-teal-50/30 transition-colors group">
+                    <div className="w-12 h-12 rounded-2xl bg-warm-50 group-hover:bg-teal-50 flex items-center justify-center mx-auto mb-3 transition-colors">
+                      <FileSpreadsheet className="w-6 h-6 text-warm-300 group-hover:text-teal-500 transition-colors" />
+                    </div>
+                    <p className="text-[14px] font-medium text-warm-600 mb-1">Drop your CSV file here</p>
+                    <p className="text-xs text-warm-400 mb-4">or click to browse files</p>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-medium transition-colors">
+                      <Upload className="w-3.5 h-3.5" />
+                      Choose File
+                    </span>
                     <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
-                <p className="text-xs text-warm-400">
-                  CSV should include columns for: First Name, Last Name, Phone, Email (optional)
-                </p>
+
+                {/* Help text */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Format Guide</span>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-4 space-y-2">
+                    <p className="text-[13px] text-warm-600">Your CSV should include columns for:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["First Name", "Last Name", "Phone", "Email"].map((col) => (
+                        <span key={col} className="inline-flex items-center px-2.5 py-1 bg-white rounded-lg border border-warm-100 text-[12px] text-warm-600 font-medium">
+                          {col}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-[12px] text-warm-400 mt-1">Column headers will be auto-detected in the next step.</p>
+                  </div>
+                </div>
               </div>
             )}
 
             {importStep === 2 && (
-              <div className="space-y-4">
-                <p className="text-sm text-warm-600">
-                  Map your CSV columns to contact fields. We auto-detected some mappings.
-                </p>
-                <div className="space-y-3">
-                  {csvHeaders.map((header, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="text-sm text-warm-600 w-32 truncate flex-shrink-0">{header}</span>
-                      <Select value={columnMapping[i]} onValueChange={(val) => {
-                        const next = [...columnMapping];
-                        next[i] = val;
-                        setColumnMapping(next);
-                      }}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mappableFields.map((f) => (
-                            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              <div className="space-y-5">
+                {/* Column mapping section */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Column Mapping</span>
+                  </div>
+                  <p className="text-[13px] text-warm-500 mb-3">
+                    Map your CSV columns to contact fields. We auto-detected some mappings.
+                  </p>
+                  <div className="space-y-2.5">
+                    {csvHeaders.map((header, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2.5 bg-warm-50 rounded-xl">
+                        <span className="text-[13px] font-medium text-warm-600 w-28 truncate flex-shrink-0" title={header}>&ldquo;{header}&rdquo;</span>
+                        <span className="text-warm-300 text-xs">&rarr;</span>
+                        <Select value={columnMapping[i]} onValueChange={(val) => {
+                          const next = [...columnMapping];
+                          next[i] = val;
+                          setColumnMapping(next);
+                        }}>
+                          <SelectTrigger className="flex-1 rounded-xl h-9 text-[13px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {mappableFields.map((f) => (
+                              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Required fields hint */}
+                  {(!columnMapping.includes("firstName") || !columnMapping.includes("phone")) && (
+                    <div className="flex items-center gap-2 mt-3 p-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <p className="text-[12px] text-amber-700">
+                        <span className="font-medium">First Name</span> and <span className="font-medium">Phone</span> columns are required to import.
+                      </p>
                     </div>
-                  ))}
+                  )}
                 </div>
 
-                {/* Preview */}
+                {/* Preview section */}
                 {csvRows.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-xs font-medium text-warm-400 mb-2">Preview (first 3 rows)</p>
-                    <div className="bg-warm-50 rounded-lg p-3 space-y-2 text-xs text-warm-600 overflow-x-auto">
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="w-3.5 h-3.5 text-warm-400" />
+                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Preview</span>
+                      <span className="text-[11px] text-warm-400 ml-auto">{csvRows.length} rows total</span>
+                    </div>
+                    <div className="bg-warm-50 rounded-xl p-3 space-y-2 overflow-x-auto">
                       {csvRows.slice(0, 3).map((row, i) => (
-                        <div key={i} className="flex gap-2">
+                        <div key={i} className="flex gap-1.5">
                           {row.map((cell, j) => (
-                            <span key={j} className="bg-white px-2 py-1 rounded border border-warm-100 truncate max-w-[120px]">
-                              {cell || <span className="text-warm-300">empty</span>}
+                            <span key={j} className="bg-white px-2.5 py-1.5 rounded-lg border border-warm-100 text-[12px] text-warm-600 truncate max-w-[120px]" title={cell || "empty"}>
+                              {cell || <span className="text-warm-300 italic">empty</span>}
                             </span>
                           ))}
                         </div>
@@ -775,59 +868,97 @@ function ContactsPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setImportStep(1)} className="flex-1">
-                    Back
-                  </Button>
-                  <Button
-                    onClick={() => { setImportStep(3); handleImport(); }}
-                    disabled={!columnMapping.includes("firstName") || !columnMapping.includes("phone")}
-                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-                  >
-                    Import {csvRows.length} Contacts
-                  </Button>
-                </div>
               </div>
             )}
 
             {importStep === 3 && (
-              <div className="flex flex-col items-center py-12">
+              <div className="flex flex-col items-center justify-center py-16">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
                   className="w-12 h-12 border-3 border-teal-200 border-t-teal-600 rounded-full mb-4"
                   style={{ borderWidth: 3 }}
                 />
-                <p className="text-sm text-warm-600">Importing contacts...</p>
+                <p className="text-[14px] font-medium text-warm-600 mb-1">Importing contacts...</p>
+                <p className="text-xs text-warm-400">This may take a moment for large files.</p>
               </div>
             )}
 
             {importStep === 4 && importResult && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
+              <div className="space-y-5">
+                {/* Success banner */}
+                <div className="flex items-center gap-3.5 p-4 bg-green-50 rounded-xl border border-green-100">
+                  <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-5 h-5 text-green-600" />
+                  </div>
                   <div>
-                    <p className="font-medium text-green-800">Import Complete</p>
-                    <p className="text-sm text-green-600">
-                      {importResult.importedCount} imported, {importResult.skippedCount} skipped, {importResult.errorCount} errors
+                    <p className="text-[14px] font-semibold text-green-800">Import Complete</p>
+                    <p className="text-[13px] text-green-600 mt-0.5">
+                      Successfully imported your contacts.
                     </p>
                   </div>
                 </div>
+
+                {/* Stats */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-3.5 h-3.5 text-warm-400" />
+                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">Results</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-teal-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-teal-700">{importResult.importedCount}</p>
+                      <p className="text-[11px] text-teal-600 font-medium">Imported</p>
+                    </div>
+                    <div className="bg-warm-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-warm-500">{importResult.skippedCount}</p>
+                      <p className="text-[11px] text-warm-500 font-medium">Skipped</p>
+                    </div>
+                    <div className={`rounded-xl p-3 text-center ${importResult.errorCount > 0 ? "bg-amber-50" : "bg-warm-50"}`}>
+                      <p className={`text-lg font-bold ${importResult.errorCount > 0 ? "text-amber-600" : "text-warm-500"}`}>{importResult.errorCount}</p>
+                      <p className={`text-[11px] font-medium ${importResult.errorCount > 0 ? "text-amber-600" : "text-warm-500"}`}>Errors</p>
+                    </div>
+                  </div>
+                </div>
+
                 {importResult.errorCount > 0 && (
-                  <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
                     <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-amber-700">
+                    <p className="text-[13px] text-amber-700">
                       Some rows were skipped due to missing data or duplicate phone numbers.
                     </p>
                   </div>
                 )}
-                <Button onClick={closeImport} className="w-full bg-teal-600 hover:bg-teal-700 text-white">
-                  View Contacts
-                </Button>
               </div>
             )}
           </div>
+
+          {/* Sticky footer */}
+          {importStep === 2 && (
+            <div className="px-6 py-4 border-t border-warm-100">
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setImportStep(1)} className="flex-1 rounded-xl h-11 text-[14px]">
+                  Back
+                </Button>
+                <Button
+                  onClick={() => { setImportStep(3); handleImport(); }}
+                  disabled={!columnMapping.includes("firstName") || !columnMapping.includes("phone")}
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import {csvRows.length} Contacts
+                </Button>
+              </div>
+            </div>
+          )}
+          {importStep === 4 && (
+            <div className="px-6 py-4 border-t border-warm-100">
+              <Button onClick={closeImport} className="w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 text-[14.5px] font-semibold">
+                <Users className="w-4 h-4 mr-2" />
+                View Contacts
+              </Button>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
     );
