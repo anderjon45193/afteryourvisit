@@ -164,12 +164,6 @@ function SignInForm() {
             </Button>
           </form>
 
-          {/* Demo credentials hint */}
-          <div className="mt-4 p-3 rounded-lg bg-teal-50 border border-teal-100">
-            <p className="text-xs font-medium text-teal-700 mb-1">Demo credentials:</p>
-            <p className="text-xs text-teal-600 font-mono">demo@afteryourvisit.com</p>
-            <p className="text-xs text-teal-600 font-mono">demo1234</p>
-          </div>
         </div>
 
         {/* Sign up link */}
