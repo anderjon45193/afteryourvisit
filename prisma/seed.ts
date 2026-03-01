@@ -52,7 +52,7 @@ async function main() {
       users: {
         create: {
           id: DEMO_USER_ID,
-          name: "Demo User",
+          name: "Dr. Patel",
           email: "demo@afteryourvisit.com",
           passwordHash,
           role: "owner",

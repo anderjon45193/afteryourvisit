@@ -30,6 +30,13 @@ const statusConfig = {
   reviewed: { label: "Reviewed", className: "bg-green-50 text-green-700" },
 };
 
+function formatPhoneDisplay(phone: string) {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+  if (digits.length !== 10) return phone;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -46,13 +53,22 @@ export default function FollowUpsPage() {
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async (page = 1, q = "") => {
+  const statusFilters = [
+    { value: "all", label: "All" },
+    { value: "sent", label: "Sent" },
+    { value: "opened", label: "Opened" },
+    { value: "reviewed", label: "Reviewed" },
+  ];
+
+  const fetchData = async (page = 1, q = "", status = statusFilter) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (q) params.set("search", q);
+      if (status && status !== "all") params.set("status", status);
       const res = await fetch(`/api/followups?${params}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
@@ -70,9 +86,9 @@ export default function FollowUpsPage() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchData(1, search), 300);
+    const timer = setTimeout(() => fetchData(1, search, statusFilter), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, statusFilter]);
 
   return (
     <>
@@ -100,6 +116,24 @@ export default function FollowUpsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 h-11"
         />
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-2 mb-6">
+        {statusFilters.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            aria-pressed={statusFilter === f.value}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              statusFilter === f.value
+                ? "bg-teal-600 text-white"
+                : "bg-warm-100 text-warm-500 hover:bg-warm-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Table / Card list */}
@@ -132,7 +166,7 @@ export default function FollowUpsPage() {
                       <span className="text-sm font-medium text-warm-800">{fu.clientFirstName}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-sm text-warm-500">{fu.clientPhone}</span>
+                      <span className="text-sm text-warm-500">{formatPhoneDisplay(fu.clientPhone)}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-sm text-warm-500">{fu.templateName}</span>

@@ -34,8 +34,15 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  if (status) {
-    where.smsStatus = status;
+  // Filter by computed display status (sent/opened/reviewed), not smsStatus
+  if (status === "reviewed") {
+    where.reviewClickedAt = { not: null };
+  } else if (status === "opened") {
+    where.pageViewedAt = { not: null };
+    where.reviewClickedAt = null;
+  } else if (status === "sent") {
+    where.pageViewedAt = null;
+    where.reviewClickedAt = null;
   }
 
   const [followUps, total] = await Promise.all([

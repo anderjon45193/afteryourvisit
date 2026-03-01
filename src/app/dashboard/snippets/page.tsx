@@ -97,7 +97,7 @@ export default function SnippetsPage() {
         <div>
           <h1 className="text-2xl text-warm-900">Snippets</h1>
           <p className="text-sm text-warm-400 mt-1">
-            Quick-insert text for follow-up notes
+            Quick-insert text for follow-up notes. Snippets appear as tappable chips when you compose a follow-up.
           </p>
         </div>
         <Button

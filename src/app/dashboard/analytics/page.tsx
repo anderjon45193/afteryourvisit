@@ -33,10 +33,11 @@ interface TimelineDay {
   reviewed: number;
 }
 
-function parseTrend(trend: string): { value: string; up: boolean; neutral: boolean } {
-  const neutral = trend === "+0%" || trend === "0%" || trend === "-0%";
+function parseTrend(trend: string, currentValue: number): { value: string; up: boolean; neutral: boolean; noData: boolean } {
+  const noData = currentValue === 0 && (trend === "-100%" || trend === "0%");
+  const neutral = noData || trend === "+0%" || trend === "0%" || trend === "-0%";
   const up = trend.startsWith("+") && !neutral;
-  return { value: trend, up, neutral };
+  return { value: noData ? "—" : trend, up, neutral, noData };
 }
 
 export default function AnalyticsPage() {
@@ -71,7 +72,7 @@ export default function AnalyticsPage() {
         {
           label: "Total Sent",
           value: String(overview.totalSent),
-          trend: parseTrend(overview.trends.sent),
+          trend: parseTrend(overview.trends.sent, overview.totalSent),
           subtext: "this month",
           icon: Send,
           color: "text-teal-600",
@@ -80,7 +81,7 @@ export default function AnalyticsPage() {
         {
           label: "Avg Open Rate",
           value: `${overview.openRate}%`,
-          trend: parseTrend(overview.trends.openRate),
+          trend: parseTrend(overview.trends.openRate, overview.openRate),
           subtext: "vs last month",
           icon: Eye,
           color: "text-blue-600",
@@ -89,7 +90,7 @@ export default function AnalyticsPage() {
         {
           label: "Review Click Rate",
           value: `${overview.reviewRate}%`,
-          trend: parseTrend(overview.trends.reviewClicks),
+          trend: parseTrend(overview.trends.reviewClicks, overview.reviewRate),
           subtext: "of sent",
           icon: Star,
           color: "text-amber-600",
@@ -98,7 +99,7 @@ export default function AnalyticsPage() {
         {
           label: "Review Clicks",
           value: String(overview.reviewClicks),
-          trend: parseTrend(overview.trends.reviews),
+          trend: parseTrend(overview.trends.reviews, overview.reviewClicks),
           subtext: "this month",
           icon: TrendingUp,
           color: "text-green-600",
@@ -192,14 +193,16 @@ export default function AnalyticsPage() {
             </div>
             <p className="text-2xl font-bold text-warm-900">{stat.value}</p>
             <p className="text-xs text-warm-400 mt-0.5">{stat.label}</p>
-            <p className="text-xs text-warm-300 mt-0.5 flex items-center gap-0.5">
-              {stat.trend.neutral ? null : stat.trend.up ? (
-                <ArrowUpRight className="w-3 h-3 text-green-500" />
-              ) : (
-                <ArrowDownRight className="w-3 h-3 text-warm-300" />
-              )}
-              {stat.trend.value} {stat.subtext}
-            </p>
+            {!stat.trend.noData && (
+              <p className="text-xs text-warm-300 mt-0.5 flex items-center gap-0.5">
+                {stat.trend.neutral ? null : stat.trend.up ? (
+                  <ArrowUpRight className="w-3 h-3 text-green-500" />
+                ) : (
+                  <ArrowDownRight className="w-3 h-3 text-warm-300" />
+                )}
+                {stat.trend.value} {stat.subtext}
+              </p>
+            )}
           </motion.div>
         ))}
       </div>

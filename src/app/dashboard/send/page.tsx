@@ -77,7 +77,7 @@ function SendFollowUpPage() {
   const [phone, setPhone] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [notes, setNotes] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -181,12 +181,18 @@ function SendFollowUpPage() {
   };
 
   const [attempted, setAttempted] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const phoneDigits = phone.replace(/\D/g, "").length;
   const canSend = firstName.trim() && phoneDigits === 10 && templateId;
 
-  const handleSend = async () => {
+  const handleSendClick = () => {
     setAttempted(true);
     if (!canSend) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirmSend = async () => {
+    setShowConfirm(false);
     setSending(true);
     setError("");
 
@@ -433,6 +439,7 @@ function SendFollowUpPage() {
                   {/* Snippet pills */}
                   {snippets.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
+                      <span className="text-[10px] uppercase tracking-wider text-warm-300 font-medium self-center mr-1">Tap to add:</span>
                       {snippets.map((s) => (
                         <button
                           key={s.id}
@@ -493,7 +500,7 @@ function SendFollowUpPage() {
 
                 {/* Send button */}
                 <Button
-                  onClick={handleSend}
+                  onClick={handleSendClick}
                   disabled={sending}
                   className="w-full h-14 text-base font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-lg"
                 >
@@ -565,6 +572,69 @@ function SendFollowUpPage() {
                 </Link>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation modal */}
+      <AnimatePresence>
+        {showConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setShowConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6"
+            >
+              <h3 className="text-lg font-semibold text-warm-900 mb-1">
+                Confirm Send
+              </h3>
+              <p className="text-sm text-warm-500 mb-4">
+                This will send a real SMS to the following recipient:
+              </p>
+              <div className="bg-warm-50 rounded-xl p-4 mb-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-warm-400">Name</span>
+                  <span className="font-medium text-warm-800">{firstName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-warm-400">Phone</span>
+                  <span className="font-medium text-warm-800">{phone}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-warm-400">Template</span>
+                  <span className="font-medium text-warm-800 truncate ml-4">
+                    {templates.find((t) => t.id === templateId)?.name || "—"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowConfirm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                  onClick={handleConfirmSend}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Now
+                </Button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

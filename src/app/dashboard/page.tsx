@@ -52,10 +52,19 @@ function getGreeting() {
   return "Good evening";
 }
 
-function parseTrend(trend: string): { value: string; up: boolean; neutral: boolean } {
-  const neutral = trend === "+0%" || trend === "0%" || trend === "-0%";
+function parseTrend(trend: string, currentValue: number): { value: string; up: boolean; neutral: boolean; noData: boolean } {
+  // When current period has no data, don't show misleading decline percentages
+  const noData = currentValue === 0 && (trend === "-100%" || trend === "0%");
+  const neutral = noData || trend === "+0%" || trend === "0%" || trend === "-0%";
   const up = trend.startsWith("+") && !neutral;
-  return { value: trend, up, neutral };
+  return { value: noData ? "—" : trend, up, neutral, noData };
+}
+
+function formatPhoneDisplay(phone: string) {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+  if (digits.length !== 10) return phone;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 function formatDate(iso: string) {
@@ -71,7 +80,7 @@ function formatDate(iso: string) {
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const userName = session?.user?.name?.split(" ")[0] || "";
+  const userName = session?.user?.name || "";
 
   const [greeting, setGreeting] = useState("");
   const [today, setToday] = useState("");
@@ -117,7 +126,7 @@ export default function DashboardPage() {
         {
           label: "Follow-ups Sent",
           value: String(overview.totalSent),
-          trend: parseTrend(overview.trends.sent),
+          trend: parseTrend(overview.trends.sent, overview.totalSent),
           icon: Send,
           iconBg: "bg-teal-50",
           iconColor: "text-teal-600",
@@ -125,7 +134,7 @@ export default function DashboardPage() {
         {
           label: "Open Rate",
           value: `${overview.openRate}%`,
-          trend: parseTrend(overview.trends.openRate),
+          trend: parseTrend(overview.trends.openRate, overview.openRate),
           icon: Eye,
           iconBg: "bg-blue-50",
           iconColor: "text-blue-600",
@@ -133,7 +142,7 @@ export default function DashboardPage() {
         {
           label: "Review Clicks",
           value: String(overview.reviewClicks),
-          trend: parseTrend(overview.trends.reviewClicks),
+          trend: parseTrend(overview.trends.reviewClicks, overview.reviewClicks),
           icon: Star,
           iconBg: "bg-amber-50",
           iconColor: "text-amber-600",
@@ -141,7 +150,7 @@ export default function DashboardPage() {
         {
           label: "Review Rate",
           value: `${overview.reviewRate}%`,
-          trend: parseTrend(overview.trends.reviews),
+          trend: parseTrend(overview.trends.reviews, overview.reviewRate),
           icon: TrendingUp,
           iconBg: "bg-green-50",
           iconColor: "text-green-600",
@@ -196,18 +205,20 @@ export default function DashboardPage() {
                   >
                     <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
                   </div>
-                  <span
-                    className={`inline-flex items-center gap-0.5 text-xs font-medium ${
-                      stat.trend.up ? "text-green-600" : "text-warm-400"
-                    }`}
-                  >
-                    {stat.trend.neutral ? null : stat.trend.up ? (
-                      <ArrowUpRight className="w-3 h-3" />
-                    ) : (
-                      <ArrowDownRight className="w-3 h-3" />
-                    )}
-                    {stat.trend.value}
-                  </span>
+                  {!stat.trend.noData && (
+                    <span
+                      className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+                        stat.trend.up ? "text-green-600" : "text-warm-400"
+                      }`}
+                    >
+                      {stat.trend.neutral ? null : stat.trend.up ? (
+                        <ArrowUpRight className="w-3 h-3" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3" />
+                      )}
+                      {stat.trend.value}
+                    </span>
+                  )}
                 </div>
                 <p className="text-2xl font-bold text-warm-900">{stat.value}</p>
                 <p className="text-xs text-warm-400 mt-1">{stat.label}</p>
@@ -297,7 +308,7 @@ export default function DashboardPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-sm text-warm-500">{fu.clientPhone}</span>
+                      <span className="text-sm text-warm-500">{formatPhoneDisplay(fu.clientPhone)}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-sm text-warm-500">
@@ -361,6 +372,8 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Spacer for FAB */}
+      <div className="h-20 lg:h-0" />
     </>
   );
 }

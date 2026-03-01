@@ -98,6 +98,13 @@ function getInitials(firstName: string, lastName: string | null) {
   return `${firstName[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 }
 
+function formatPhoneDisplay(phone: string) {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+  if (digits.length !== 10) return phone;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 // Simple CSV parser
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -1135,7 +1142,7 @@ function ContactsPage() {
                               <span className="text-xl font-semibold text-amber-600">Yes</span>
                             </div>
                           ) : (
-                            <p className="text-xl font-semibold text-warm-300">&mdash;</p>
+                            <p className="text-sm font-medium text-warm-400">Not yet</p>
                           )}
                           <p className="text-xs text-warm-400 mt-0.5">Review Left</p>
                         </div>
@@ -1546,8 +1553,8 @@ function ContactsPage() {
                           {getInitials(contact.firstName, contact.lastName)}
                         </span>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-warm-800">
+                      <div className="min-w-0 max-w-[200px]">
+                        <p className="text-sm font-medium text-warm-800 truncate">
                           {contact.firstName} {contact.lastName || ""}
                         </p>
                         {contact.optedOut && (
@@ -1556,7 +1563,7 @@ function ContactsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="p-3 text-sm text-warm-600">{contact.phone}</td>
+                  <td className="p-3 text-sm text-warm-600">{formatPhoneDisplay(contact.phone)}</td>
                   <td className="p-3 text-sm text-warm-600 hidden lg:table-cell">{contact.email || "--"}</td>
                   <td className="p-3 text-sm text-warm-600 text-center">{contact.totalFollowUps}</td>
                   <td className="p-3 text-sm text-warm-400 hidden xl:table-cell">{relativeDate(contact.lastFollowUpAt)}</td>
@@ -1608,7 +1615,7 @@ function ContactsPage() {
                 <p className="text-sm font-medium text-warm-800 truncate">
                   {contact.firstName} {contact.lastName || ""}
                 </p>
-                <p className="text-xs text-warm-400">{contact.phone}</p>
+                <p className="text-xs text-warm-400">{formatPhoneDisplay(contact.phone)}</p>
               </div>
               {contact.hasLeftReview && (
                 <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />

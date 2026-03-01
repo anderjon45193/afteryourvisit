@@ -8,8 +8,9 @@ import { Plus } from "lucide-react";
 export function FloatingActionButton() {
   const pathname = usePathname();
 
-  // Hide on the Send page itself and on the welcome page
-  if (pathname === "/dashboard/send" || pathname === "/dashboard/welcome") {
+  // Only show on pages where quick send is contextually relevant
+  const showOnPages = ["/dashboard", "/dashboard/followups", "/dashboard/contacts"];
+  if (!showOnPages.includes(pathname)) {
     return null;
   }
 
