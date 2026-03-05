@@ -1,15 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 
+type Range = "7d" | "30d" | "90d";
+
 // GET /api/analytics/timeline — Time-series data for charts
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { error, business } = await getAuthenticatedBusiness();
+
+  const range = (request.nextUrl.searchParams.get("range") || "7d") as Range;
+  const days = range === "90d" ? 90 : range === "30d" ? 30 : 7;
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   if (error) {
-    // Return empty 7-day timeline so charts render
-    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const timeline = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       timeline.push({
@@ -23,27 +29,27 @@ export async function GET() {
     return NextResponse.json(timeline);
   }
 
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
   const now = new Date();
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(now.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const rangeStart = new Date();
+  rangeStart.setDate(now.getDate() - (days - 1));
+  rangeStart.setHours(0, 0, 0, 0);
 
   // Initialize day buckets
-  const days: Record<string, { day: string; sent: number; opened: number; reviewed: number }> = {};
-  for (let i = 6; i >= 0; i--) {
+  const buckets: Record<
+    string,
+    { day: string; sent: number; opened: number; reviewed: number }
+  > = {};
+  for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().split("T")[0];
-    const dayName = dayNames[d.getDay()];
-    days[key] = { day: dayName, sent: 0, opened: 0, reviewed: 0 };
+    buckets[key] = { day: dayNames[d.getDay()], sent: 0, opened: 0, reviewed: 0 };
   }
 
   const followUps = await prisma.followUp.findMany({
     where: {
       businessId: business!.id,
-      createdAt: { gte: sevenDaysAgo },
+      createdAt: { gte: rangeStart },
     },
     select: {
       createdAt: true,
@@ -54,14 +60,14 @@ export async function GET() {
 
   for (const fu of followUps) {
     const key = fu.createdAt.toISOString().split("T")[0];
-    if (days[key]) {
-      days[key].sent++;
-      if (fu.pageViewedAt) days[key].opened++;
-      if (fu.reviewClickedAt) days[key].reviewed++;
+    if (buckets[key]) {
+      buckets[key].sent++;
+      if (fu.pageViewedAt) buckets[key].opened++;
+      if (fu.reviewClickedAt) buckets[key].reviewed++;
     }
   }
 
-  const timeline = Object.entries(days).map(([date, data]) => ({
+  const timeline = Object.entries(buckets).map(([date, data]) => ({
     date,
     ...data,
   }));

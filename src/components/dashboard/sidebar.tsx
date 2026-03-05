@@ -144,7 +144,7 @@ export function Sidebar() {
             <p className="text-sm font-medium text-warm-800 truncate">
               {user?.name || "Loading..."}
             </p>
-            <p className="text-xs text-warm-400 truncate mt-0.5">
+            <p className="text-xs text-warm-400 truncate mt-0.5" title={user?.email || ""}>
               {user?.email || ""}
             </p>
           </div>

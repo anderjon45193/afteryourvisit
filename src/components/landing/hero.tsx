@@ -24,11 +24,11 @@ export function Hero() {
             transition={{ duration: 0.7, ease: "easeOut" }}
           >
             <h1 className="text-4xl sm:text-5xl lg:text-[56px] leading-tight text-warm-900 tracking-tight">
-              Every visit deserves a follow-up.
+              Turn every appointment into a 5-star review.
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-warm-500 max-w-xl leading-relaxed">
-              Turn every appointment into a 5-star Google review — automatically.
-              Send branded follow-up texts your clients actually love.
+              Send branded follow-up texts after every visit that your clients
+              actually love — and that generate Google reviews on autopilot.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               <Link href="/sign-up">

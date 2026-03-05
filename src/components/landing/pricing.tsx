@@ -209,7 +209,7 @@ export function Pricing() {
                   {plan.cta}
                 </Button>
               ) : (
-                <Link href="/sign-up" className="block">
+                <Link href={`/sign-up?plan=${plan.id}`} className="block">
                   <Button
                     className={`w-full py-5 text-base font-semibold ${
                       plan.popular

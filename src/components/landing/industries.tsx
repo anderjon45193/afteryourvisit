@@ -6,6 +6,7 @@ const industries = [
   {
     icon: "🦷",
     name: "Dentists & Orthodontists",
+    type: "dentist",
     preview:
       "\"Hi Sarah! Thanks for visiting Smile Dental today. Here's your visit summary with aftercare instructions...\"",
     demoId: "fu-1",
@@ -13,6 +14,7 @@ const industries = [
   {
     icon: "🐾",
     name: "Veterinarians",
+    type: "vet",
     preview:
       "\"Hi Mike! Thanks for bringing Buddy to Paws & Claws today. Here are the visit notes from Dr. Chen...\"",
     demoId: "fu-2",
@@ -20,6 +22,7 @@ const industries = [
   {
     icon: "🔧",
     name: "Auto Mechanics & Shops",
+    type: "mechanic",
     preview:
       "\"Hi James! Your oil change at Precision Auto Works is complete. Here's your service summary and maintenance tips...\"",
     demoId: "fu-4",
@@ -27,6 +30,7 @@ const industries = [
   {
     icon: "✂️",
     name: "Salons & Spas",
+    type: "salon",
     preview:
       "\"Hi Emma! Thanks for visiting Glow Studio today. Here are your stylist's product recommendations...\"",
     demoId: "fu-3",
@@ -34,6 +38,7 @@ const industries = [
   {
     icon: "🦴",
     name: "Chiropractors & PT",
+    type: "chiro",
     preview:
       "\"Hi Alex! Here's your visit summary from Back in Balance. Remember to do your exercises daily...\"",
     demoId: "fu-5",
@@ -41,6 +46,7 @@ const industries = [
   {
     icon: "🏥",
     name: "Medical Practices",
+    type: "medical",
     preview:
       "\"Hi David! Thanks for visiting Lakeside Family Medicine today. Here are your visit notes and next steps...\"",
     demoId: "fu-6",
@@ -56,7 +62,7 @@ export function Industries() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="text-center mb-12"
         >
           <h2 className="text-3xl sm:text-4xl text-warm-900 mb-4">
             Built for every local business
@@ -70,7 +76,7 @@ export function Industries() {
           {industries.map((ind, i) => (
             <motion.a
               key={ind.name}
-              href="/sign-up"
+              href={`/sign-up?type=${ind.type}`}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}

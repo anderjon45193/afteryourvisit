@@ -60,6 +60,8 @@ function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillEmail = searchParams.get("email") || "";
+  const prefillPlan = searchParams.get("plan") || "";
+  const prefillType = searchParams.get("type") || "";
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -72,7 +74,9 @@ function SignUpForm() {
 
   // Step 2: Business
   const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("");
+  const [businessType, setBusinessType] = useState(
+    businessTypes.some((bt) => bt.value === prefillType) ? prefillType : ""
+  );
   const [businessPhone, setBusinessPhone] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
 
@@ -299,6 +303,11 @@ function SignUpForm() {
               </h1>
               <p className="text-sm text-warm-400 mb-6">
                 Start your 14-day free trial. No credit card required.
+                {prefillPlan && (
+                  <span className="inline-flex items-center ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100 capitalize">
+                    {prefillPlan} plan
+                  </span>
+                )}
               </p>
 
               <div className="space-y-4">

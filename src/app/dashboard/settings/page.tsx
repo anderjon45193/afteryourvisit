@@ -27,6 +27,8 @@ import {
   X,
 } from "lucide-react";
 import { PLANS, getPlanLimits } from "@/lib/stripe";
+import { toast } from "sonner";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 const tabs = [
   { id: "profile", label: "Business Profile", icon: Building2 },
@@ -270,13 +272,17 @@ function SettingsContent() {
         setBusiness(updated);
         setProfileSaved(true);
         setTimeout(() => setProfileSaved(false), 3000);
+        toast.success("Profile saved successfully");
       } else {
         const errData = await res.json().catch(() => ({}));
         const errMsg = errData.error || `Failed to save changes (${res.status})`;
-        setProfileError(errMsg.includes("Unauthorized") ? "Your session has expired. Please sign in again." : errMsg);
+        const displayMsg = errMsg.includes("Unauthorized") ? "Your session has expired. Please sign in again." : errMsg;
+        setProfileError(displayMsg);
+        toast.error(displayMsg);
       }
     } catch {
       setProfileError("Failed to save changes. Please try again.");
+      toast.error("Failed to save changes. Please try again.");
     } finally {
       setProfileSaving(false);
     }
@@ -524,6 +530,7 @@ function SettingsContent() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Settings" }]} />
       <div className="mb-6">
         <h1 className="text-2xl text-warm-900">Settings</h1>
         <p className="text-sm text-warm-400 mt-1">
@@ -685,24 +692,26 @@ function SettingsContent() {
                   </label>
                   <div className="flex gap-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-warm-400">Primary</label>
+                      <label htmlFor="brand-primary-color" className="text-xs text-warm-400">Primary</label>
                       <input
+                        id="brand-primary-color"
                         type="color"
                         value={profileForm.brandPrimaryColor}
                         onChange={(e) => updateProfile("brandPrimaryColor", e.target.value)}
                         className="w-8 h-8 rounded-lg border border-warm-200 cursor-pointer p-0.5"
                       />
-                      <Input value={profileForm.brandPrimaryColor} onChange={(e) => updateProfile("brandPrimaryColor", e.target.value)} className="w-28 text-sm" />
+                      <Input id="brand-primary-hex" aria-label="Primary color hex value" value={profileForm.brandPrimaryColor} onChange={(e) => updateProfile("brandPrimaryColor", e.target.value)} className="w-28 text-sm" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-warm-400">Secondary</label>
+                      <label htmlFor="brand-secondary-color" className="text-xs text-warm-400">Secondary</label>
                       <input
+                        id="brand-secondary-color"
                         type="color"
                         value={profileForm.brandSecondaryColor}
                         onChange={(e) => updateProfile("brandSecondaryColor", e.target.value)}
                         className="w-8 h-8 rounded-lg border border-warm-200 cursor-pointer p-0.5"
                       />
-                      <Input value={profileForm.brandSecondaryColor} onChange={(e) => updateProfile("brandSecondaryColor", e.target.value)} className="w-28 text-sm" />
+                      <Input id="brand-secondary-hex" aria-label="Secondary color hex value" value={profileForm.brandSecondaryColor} onChange={(e) => updateProfile("brandSecondaryColor", e.target.value)} className="w-28 text-sm" />
                     </div>
                   </div>
                 </div>
@@ -1046,7 +1055,7 @@ function SettingsContent() {
               {locationError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 flex items-center justify-between">
                   {locationError}
-                  <button onClick={() => setLocationError(null)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                  <button onClick={() => setLocationError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss error"><X className="w-4 h-4" /></button>
                 </div>
               )}
 
@@ -1061,8 +1070,9 @@ function SettingsContent() {
                     <div className="border border-teal-200 bg-teal-50/30 rounded-lg p-4">
                       <div className="grid sm:grid-cols-3 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
+                          <label htmlFor="loc-name" className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
                           <Input
+                            id="loc-name"
                             placeholder="e.g. Main Office"
                             value={locationForm.name}
                             onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))}
@@ -1073,16 +1083,18 @@ function SettingsContent() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Address</label>
+                          <label htmlFor="loc-address" className="block text-xs font-medium text-warm-600 mb-1">Address</label>
                           <Input
+                            id="loc-address"
                             placeholder="123 Main St"
                             value={locationForm.address}
                             onChange={(e) => setLocationForm((f) => ({ ...f, address: e.target.value }))}
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Phone</label>
+                          <label htmlFor="loc-phone" className="block text-xs font-medium text-warm-600 mb-1">Phone</label>
                           <Input
+                            id="loc-phone"
                             placeholder="(555) 123-4567"
                             value={locationForm.phone}
                             onChange={(e) => setLocationForm((f) => ({ ...f, phone: e.target.value }))}
@@ -1178,6 +1190,7 @@ function SettingsContent() {
                               variant="outline"
                               size="sm"
                               className="h-8 w-8 p-0"
+                              aria-label={`Edit ${loc.name}`}
                               onClick={() => {
                                 setEditingLocationId(loc.id);
                                 setEditLocationForm({ name: loc.name, address: loc.address || "", phone: loc.phone || "" });
@@ -1190,6 +1203,7 @@ function SettingsContent() {
                               variant="outline"
                               size="sm"
                               className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              aria-label={`Delete ${loc.name}`}
                               onClick={() => handleDeleteLocation(loc.id)}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1253,7 +1267,7 @@ function SettingsContent() {
               {teamError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 flex items-center justify-between">
                   {teamError}
-                  <button onClick={() => setTeamError(null)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                  <button onClick={() => setTeamError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss error"><X className="w-4 h-4" /></button>
                 </div>
               )}
 
@@ -1274,8 +1288,9 @@ function SettingsContent() {
                     <div className="border border-teal-200 bg-teal-50/30 rounded-lg p-4">
                       <div className="grid sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
+                          <label htmlFor="team-name" className="block text-xs font-medium text-warm-600 mb-1">Name *</label>
                           <Input
+                            id="team-name"
                             placeholder="Full name"
                             value={teamForm.name}
                             onChange={(e) => setTeamForm((f) => ({ ...f, name: e.target.value }))}
@@ -1287,8 +1302,9 @@ function SettingsContent() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Email *</label>
+                          <label htmlFor="team-email" className="block text-xs font-medium text-warm-600 mb-1">Email *</label>
                           <Input
+                            id="team-email"
                             type="email"
                             placeholder="email@example.com"
                             value={teamForm.email}
@@ -1301,8 +1317,9 @@ function SettingsContent() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Temporary Password * (min 8 chars)</label>
+                          <label htmlFor="team-password" className="block text-xs font-medium text-warm-600 mb-1">Temporary Password * (min 8 chars)</label>
                           <Input
+                            id="team-password"
                             type="password"
                             placeholder="Min 8 characters"
                             value={teamForm.password}
@@ -1318,8 +1335,9 @@ function SettingsContent() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-warm-600 mb-1">Role</label>
+                          <label htmlFor="team-role" className="block text-xs font-medium text-warm-600 mb-1">Role</label>
                           <select
+                            id="team-role"
                             value={teamForm.role}
                             onChange={(e) => setTeamForm((f) => ({ ...f, role: e.target.value }))}
                             className="w-full h-9 rounded-md border border-warm-200 bg-white px-3 text-sm text-warm-700"
@@ -1411,6 +1429,7 @@ function SettingsContent() {
                                   variant="outline"
                                   size="sm"
                                   className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  aria-label={`Remove ${member.name}`}
                                   onClick={() => handleDeleteMember(member.id)}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

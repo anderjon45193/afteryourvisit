@@ -47,7 +47,10 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { TagInput } from "@/components/dashboard/tag-input";
+import { MaskedPhone } from "@/components/shared/masked-phone";
+import { toast } from "sonner";
 import Link from "next/link";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 interface Contact {
   id: string;
@@ -96,13 +99,6 @@ function relativeDate(dateStr: string | null) {
 
 function getInitials(firstName: string, lastName: string | null) {
   return `${firstName[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
-}
-
-function formatPhoneDisplay(phone: string) {
-  let digits = phone.replace(/\D/g, "");
-  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
-  if (digits.length !== 10) return phone;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 // Simple CSV parser
@@ -341,8 +337,9 @@ function ContactsPage() {
       setEditing(false);
       fetchContacts();
       fetchTags();
+      toast.success("Contact updated");
     } catch {
-      // ignore
+      toast.error("Failed to update contact");
     }
   };
 
@@ -400,8 +397,10 @@ function ContactsPage() {
       setAddForm({ firstName: "", lastName: "", phone: "", email: "", notes: "", tags: [] });
       setAddAttempted(false);
       fetchContacts();
+      toast.success("Contact added");
     } catch {
       setAddError("Something went wrong");
+      toast.error("Failed to add contact");
     }
   };
 
@@ -416,8 +415,9 @@ function ContactsPage() {
       });
       setSelectedIds(new Set());
       fetchContacts();
+      toast.success(`${ids.length} contact${ids.length !== 1 ? "s" : ""} deleted`);
     } catch {
-      // ignore
+      toast.error("Failed to delete contacts");
     }
   };
 
@@ -525,8 +525,9 @@ function ContactsPage() {
       const data = await res.json();
       setImportResult(data);
       setImportStep(4);
+      toast.success(`${data.importedCount} contacts imported`);
     } catch {
-      // ignore
+      toast.error("Import failed");
     } finally {
       setImporting(false);
     }
@@ -564,6 +565,7 @@ function ContactsPage() {
   if (!loading && contacts.length === 0 && !search && filter === "all" && !tagFilter) {
     return (
       <>
+        <Breadcrumbs items={[{ label: "Contacts" }]} />
         <div className="mb-6">
           <h1 className="text-2xl text-warm-900">Contacts</h1>
           <p className="text-sm text-warm-400 mt-1">Manage your client database</p>
@@ -1410,6 +1412,7 @@ function ContactsPage() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Contacts" }]} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -1506,21 +1509,22 @@ function ContactsPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-warm-100">
-              <th className="w-10 p-3">
+              <th scope="col" className="w-10 p-3">
                 <input
                   type="checkbox"
                   checked={selectedIds.size === contacts.length && contacts.length > 0}
                   onChange={toggleSelectAll}
                   className="rounded border-warm-300"
+                  aria-label="Select all contacts"
                 />
               </th>
-              <th className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Name</th>
-              <th className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Phone</th>
-              <th className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden lg:table-cell">Email</th>
-              <th className="text-center text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Follow-ups</th>
-              <th className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden xl:table-cell">Last Follow-up</th>
-              <th className="text-center text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Review</th>
-              <th className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden xl:table-cell">Tags</th>
+              <th scope="col" className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Name</th>
+              <th scope="col" className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Phone</th>
+              <th scope="col" className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden lg:table-cell">Email</th>
+              <th scope="col" className="text-center text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Follow-ups</th>
+              <th scope="col" className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden xl:table-cell">Last Follow-up</th>
+              <th scope="col" className="text-center text-xs font-medium text-warm-400 p-3 uppercase tracking-wider">Review</th>
+              <th scope="col" className="text-left text-xs font-medium text-warm-400 p-3 uppercase tracking-wider hidden xl:table-cell">Tags</th>
             </tr>
           </thead>
           <tbody>
@@ -1536,7 +1540,7 @@ function ContactsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
                   onClick={() => openDetail(contact.id)}
-                  className="border-b border-warm-50 hover:bg-warm-50/50 cursor-pointer transition-colors"
+                  className="border-b border-warm-50 hover:bg-warm-100/70 cursor-pointer transition-colors"
                 >
                   <td className="p-3" onClick={(e) => e.stopPropagation()}>
                     <input
@@ -1563,7 +1567,7 @@ function ContactsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="p-3 text-sm text-warm-600">{formatPhoneDisplay(contact.phone)}</td>
+                  <td className="p-3 text-sm text-warm-600"><MaskedPhone phone={contact.phone} /></td>
                   <td className="p-3 text-sm text-warm-600 hidden lg:table-cell">{contact.email || "--"}</td>
                   <td className="p-3 text-sm text-warm-600 text-center">{contact.totalFollowUps}</td>
                   <td className="p-3 text-sm text-warm-400 hidden xl:table-cell">{relativeDate(contact.lastFollowUpAt)}</td>
@@ -1615,7 +1619,7 @@ function ContactsPage() {
                 <p className="text-sm font-medium text-warm-800 truncate">
                   {contact.firstName} {contact.lastName || ""}
                 </p>
-                <p className="text-xs text-warm-400">{formatPhoneDisplay(contact.phone)}</p>
+                <p className="text-xs text-warm-400"><MaskedPhone phone={contact.phone} className="text-xs" /></p>
               </div>
               {contact.hasLeftReview && (
                 <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />

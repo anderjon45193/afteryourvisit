@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       lastFollowUpAt: true,
     },
     take: 5,
-    orderBy: { firstName: "asc" },
+    orderBy: [{ lastFollowUpAt: "desc" }, { firstName: "asc" }],
   });
 
   return NextResponse.json(results);

@@ -102,6 +102,7 @@ async function main() {
 
   // ─── 2. System templates ─────────────────────────────────
   const systemTemplates = [
+    // Dental templates
     {
       name: "Standard Cleaning",
       smsMessage:
@@ -192,27 +193,119 @@ async function main() {
       isSystemTemplate: true,
       businessId: demoBiz.id,
     },
+    // Veterinary templates
+    {
+      name: "Vet Wellness Visit",
+      smsMessage:
+        "Hi {{firstName}}! Thanks for bringing your pet to {{businessName}} today. Visit details: {{link}}",
+      pageHeading: "Thanks for visiting, {{firstName}}!",
+      pageSubheading: "Here's a summary of today's visit",
+      sections: [
+        { type: "notes", title: "Visit Notes", content: "{{customNotes}}" },
+        {
+          type: "checklist",
+          title: "Pet Care Reminders",
+          items: [
+            "Continue regular flea and tick prevention",
+            "Keep vaccinations up to date",
+            "Schedule next wellness exam in 12 months",
+            "Monitor appetite and energy levels",
+          ],
+        },
+      ],
+      showReviewCta: true,
+      showBookingCta: true,
+      isDefault: false,
+      isSystemTemplate: true,
+      businessId: demoBiz.id,
+    },
+    // Auto / Mechanic templates
+    {
+      name: "Service Complete",
+      smsMessage:
+        "Hi {{firstName}}! Your vehicle service at {{businessName}} is complete. Details: {{link}}",
+      pageHeading: "Service Summary for {{firstName}}",
+      pageSubheading: null,
+      sections: [
+        { type: "notes", title: "Service Notes", content: "{{customNotes}}" },
+        {
+          type: "checklist",
+          title: "Maintenance Reminders",
+          items: [
+            "Next oil change in 5,000 miles or 6 months",
+            "Check tire pressure monthly",
+            "Rotate tires every 7,500 miles",
+          ],
+        },
+      ],
+      showReviewCta: true,
+      showBookingCta: true,
+      isDefault: false,
+      isSystemTemplate: true,
+      businessId: demoBiz.id,
+    },
+    // Salon & Spa templates
+    {
+      name: "Salon Visit",
+      smsMessage:
+        "Hi {{firstName}}! Thanks for visiting {{businessName}}. Here's your visit recap: {{link}}",
+      pageHeading: "Thanks for your visit, {{firstName}}!",
+      pageSubheading: "We loved having you",
+      sections: [
+        { type: "notes", title: "Stylist Notes", content: "{{customNotes}}" },
+        {
+          type: "checklist",
+          title: "Hair Care Tips",
+          items: [
+            "Wait 48 hours before washing color-treated hair",
+            "Use sulfate-free shampoo to preserve color",
+            "Book your next appointment in 6-8 weeks",
+          ],
+        },
+      ],
+      showReviewCta: true,
+      showBookingCta: true,
+      isDefault: false,
+      isSystemTemplate: true,
+      businessId: demoBiz.id,
+    },
+    // General / Universal template
+    {
+      name: "General Follow-Up",
+      smsMessage:
+        "Hi {{firstName}}! Thanks for visiting {{businessName}}. Here's your summary: {{link}}",
+      pageHeading: "Thanks for visiting, {{firstName}}!",
+      pageSubheading: null,
+      sections: [
+        { type: "notes", title: "Visit Notes", content: "{{customNotes}}" },
+        {
+          type: "text",
+          title: "Next Steps",
+          content: "If you have any questions, don't hesitate to reach out. We're here to help!",
+        },
+      ],
+      showReviewCta: true,
+      showBookingCta: true,
+      isDefault: false,
+      isSystemTemplate: true,
+      businessId: demoBiz.id,
+    },
   ];
 
-  // Check if templates already exist (check globally to prevent duplicates)
-  const existingTemplates = await prisma.template.count({
-    where: { isSystemTemplate: true },
-  });
-
+  // Upsert templates by name to ensure all exist without duplicates
   let tplIds: string[] = [];
-  if (existingTemplates === 0) {
-    for (const tpl of systemTemplates) {
+  for (const tpl of systemTemplates) {
+    const existing = await prisma.template.findFirst({
+      where: { name: tpl.name, businessId: demoBiz.id, isSystemTemplate: true },
+    });
+    if (existing) {
+      tplIds.push(existing.id);
+      console.log(`⏭ Template already exists: ${tpl.name}`);
+    } else {
       const created = await prisma.template.create({ data: tpl });
       tplIds.push(created.id);
       console.log(`✓ Template: ${created.name} (${created.id})`);
     }
-  } else {
-    console.log(`⏭ System templates already exist (${existingTemplates})`);
-    const existing = await prisma.template.findMany({
-      where: { isSystemTemplate: true },
-      select: { id: true },
-    });
-    tplIds = existing.map((t) => t.id);
   }
 
   // ─── 3. Demo contacts ────────────────────────────────────

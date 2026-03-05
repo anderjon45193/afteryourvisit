@@ -20,10 +20,11 @@ import {
   ChevronUp,
   Eye,
   Sparkles,
-  ArrowLeft,
   UserPlus,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 interface Template {
   id: string;
@@ -214,8 +215,11 @@ function SendFollowUpPage() {
       }
 
       setSent(true);
+      toast.success(`Follow-up sent to ${firstName}!`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }
@@ -243,14 +247,7 @@ function SendFollowUpPage() {
 
   return (
     <div className="max-w-[560px] mx-auto">
-      {/* Back link */}
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm text-warm-400 hover:text-warm-600 transition-colors mb-6"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Dashboard
-      </Link>
+      <Breadcrumbs items={[{ label: "Send Follow-Up" }]} />
 
       <AnimatePresence mode="wait">
         {!sent ? (

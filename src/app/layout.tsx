@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Serif_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { SessionProvider } from "@/components/shared/session-provider";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const dmSerif = DM_Serif_Display({
@@ -51,7 +52,10 @@ export default function RootLayout({
       <body
         className={`${dmSerif.variable} ${plusJakarta.variable} antialiased`}
       >
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          {children}
+          <Toaster richColors position="bottom-right" />
+        </SessionProvider>
       </body>
     </html>
   );

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Eye, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import Link from "next/link";
+import { MaskedPhone } from "@/components/shared/masked-phone";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 interface FollowUpItem {
   id: string;
@@ -29,13 +31,6 @@ const statusConfig = {
   opened: { label: "Opened", className: "bg-blue-50 text-blue-700" },
   reviewed: { label: "Reviewed", className: "bg-green-50 text-green-700" },
 };
-
-function formatPhoneDisplay(phone: string) {
-  let digits = phone.replace(/\D/g, "");
-  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
-  if (digits.length !== 10) return phone;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -90,8 +85,13 @@ export default function FollowUpsPage() {
     return () => clearTimeout(timer);
   }, [search, statusFilter]);
 
+  const openFollowUp = (id: string) => {
+    window.open(`/v/${id}`, "_blank");
+  };
+
   return (
     <>
+      <Breadcrumbs items={[{ label: "Follow-Ups" }]} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl text-warm-900">Follow-Ups</h1>
@@ -143,12 +143,12 @@ export default function FollowUpsPage() {
           <table className="w-full" aria-label="Follow-ups history">
             <thead>
               <tr className="border-b border-warm-100 bg-warm-50/50">
-                <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Client</th>
-                <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Phone</th>
-                <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Template</th>
-                <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Sent</th>
-                <th className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Status</th>
-                <th className="text-right text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Actions</th>
+                <th scope="col" className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Client</th>
+                <th scope="col" className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Phone</th>
+                <th scope="col" className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Template</th>
+                <th scope="col" className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Sent</th>
+                <th scope="col" className="text-left text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Status</th>
+                <th scope="col" className="text-right text-xs font-medium text-warm-400 uppercase tracking-wider px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -160,13 +160,19 @@ export default function FollowUpsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.2, delay: i * 0.03 }}
-                    className="border-b border-warm-50 last:border-0 hover:bg-warm-50/50 transition-colors"
+                    className="border-b border-warm-50 last:border-0 hover:bg-warm-100/70 transition-colors cursor-pointer"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => openFollowUp(fu.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") openFollowUp(fu.id);
+                    }}
                   >
                     <td className="px-5 py-3.5">
                       <span className="text-sm font-medium text-warm-800">{fu.clientFirstName}</span>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-sm text-warm-500">{formatPhoneDisplay(fu.clientPhone)}</span>
+                    <td className="px-5 py-3.5 text-sm text-warm-500" onClick={(e) => e.stopPropagation()}>
+                      <MaskedPhone phone={fu.clientPhone} />
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-sm text-warm-500">{fu.templateName}</span>
@@ -179,7 +185,7 @@ export default function FollowUpsPage() {
                         {fu.status === "reviewed" && "⭐ "}{status.label}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link href={`/v/${fu.id}`} target="_blank">
                         <Button variant="ghost" size="sm" className="text-warm-400 hover:text-teal-600">
                           <Eye className="w-4 h-4" />
@@ -198,14 +204,25 @@ export default function FollowUpsPage() {
           {followUps.map((fu) => {
             const status = statusConfig[fu.status];
             return (
-              <div key={fu.id} className="p-4 hover:bg-warm-50/50 transition-colors">
+              <div
+                key={fu.id}
+                className="p-4 hover:bg-warm-100/70 transition-colors cursor-pointer"
+                role="link"
+                tabIndex={0}
+                onClick={() => openFollowUp(fu.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openFollowUp(fu.id);
+                }}
+              >
                 <div className="flex items-start justify-between mb-1">
                   <span className="text-sm font-medium text-warm-800">{fu.clientFirstName}</span>
                   <Badge variant="secondary" className={`${status.className} text-[10px] font-medium`}>
                     {fu.status === "reviewed" && "⭐ "}{status.label}
                   </Badge>
                 </div>
-                <p className="text-xs text-warm-500">{fu.clientPhone}</p>
+                <p className="text-xs text-warm-500" onClick={(e) => e.stopPropagation()}>
+                  <MaskedPhone phone={fu.clientPhone} className="text-xs" />
+                </p>
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-xs text-warm-300">{formatDate(fu.createdAt)}</p>
                   <span className="text-xs text-warm-400">{fu.templateName}</span>

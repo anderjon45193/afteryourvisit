@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import {
   Sheet,
   SheetContent,
@@ -490,6 +491,7 @@ export default function TemplatesPage() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Templates" }]} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl text-warm-900">Templates</h1>

@@ -16,6 +16,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 const integrations = [
   {
@@ -104,6 +105,7 @@ export default function IntegrationsPage() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Integrations" }]} />
       <div className="mb-6">
         <h1 className="text-2xl text-warm-900">Integrations</h1>
         <p className="text-sm text-warm-400 mt-1">

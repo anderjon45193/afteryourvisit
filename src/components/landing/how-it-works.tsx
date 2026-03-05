@@ -16,14 +16,14 @@ const steps = [
     icon: Send,
     title: "You tap 'Send'",
     description:
-      "In under 30 seconds, enter their name and phone number. We send a beautiful, branded follow-up text instantly.",
+      "In under 30 seconds, enter their name and phone number. We send a branded follow-up text instantly.",
   },
   {
     number: "03",
     icon: Star,
-    title: "They review",
+    title: "Reviews roll in",
     description:
-      "Your client gets a personalized follow-up page with their visit notes and a gentle nudge to leave a Google review.",
+      "Clients open their visit summary, feel appreciated, and leave you a glowing Google review — without being asked twice.",
   },
 ];
 

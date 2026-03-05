@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Sparkles, Trash2, X, Loader2 } from "lucide-react";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 interface Snippet {
   id: string;
@@ -93,6 +94,7 @@ export default function SnippetsPage() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Snippets" }]} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl text-warm-900">Snippets</h1>

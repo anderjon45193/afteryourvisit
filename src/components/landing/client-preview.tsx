@@ -18,7 +18,7 @@ export function ClientPreview() {
             What your clients see
           </h2>
           <p className="text-lg text-warm-500 max-w-2xl mx-auto">
-            A beautiful, mobile-first follow-up page branded to your business.
+            A branded follow-up page that works on any phone.
             No app download, no login, no friction.
           </p>
         </motion.div>
