@@ -7,18 +7,13 @@ export async function GET() {
   const { error, business } = await getAuthenticatedBusiness();
   if (error) return NextResponse.json({ tags: [] });
 
-  const contacts = await prisma.contact.findMany({
-    where: { businessId: business!.id },
-    select: { tags: true },
-  });
+  const result = await prisma.$queryRaw<{ tag: string }[]>`
+    SELECT DISTINCT UNNEST(tags) AS tag
+    FROM "Contact"
+    WHERE "businessId" = ${business!.id}
+    ORDER BY tag
+  `;
 
-  const tagSet = new Set<string>();
-  for (const contact of contacts) {
-    for (const tag of contact.tags) {
-      tagSet.add(tag);
-    }
-  }
-
-  const tags = Array.from(tagSet).sort();
+  const tags = result.map((r: { tag: string }) => r.tag);
   return NextResponse.json({ tags });
 }
