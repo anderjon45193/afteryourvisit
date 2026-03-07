@@ -1,11 +1,8 @@
 import { Resend } from "resend";
 import { getBaseUrl } from "@/lib/stripe";
+import { RESEND_API_KEY, IS_DEV_MODE } from "@/lib/env";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
-
-const isDevMode =
-  !process.env.RESEND_API_KEY ||
-  process.env.RESEND_API_KEY === "re_placeholder";
+const resend = new Resend(RESEND_API_KEY || undefined);
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "AfterYourVisit <noreply@afteryourvisit.com>";
 
@@ -20,7 +17,7 @@ export async function sendPasswordResetEmail(
   const baseUrl = getBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-  if (isDevMode) {
+  if (IS_DEV_MODE) {
     console.log(`[Email] DEV MODE — Password reset email not sent`);
     console.log(`  To: ${email}`);
     console.log(`  Reset URL: ${resetUrl}`);

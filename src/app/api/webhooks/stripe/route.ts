@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe, getPlanByPriceId } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
+import { STRIPE_WEBHOOK_SECRET, IS_DEV_MODE } from "@/lib/env";
 
 // POST /api/webhooks/stripe — Handle Stripe subscription events
 export async function POST(request: Request) {
@@ -9,25 +10,28 @@ export async function POST(request: Request) {
 
   let event;
 
-  // In production, verify webhook signature
-  if (process.env.STRIPE_WEBHOOK_SECRET && sig) {
+  if (STRIPE_WEBHOOK_SECRET) {
+    // Verify webhook signature (required in production)
+    if (!sig) {
+      return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
+    }
     try {
-      event = stripe.webhooks.constructEvent(
-        body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
+      event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
     } catch (err) {
       console.error("[Stripe Webhook] Signature verification failed:", err);
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
-  } else {
-    // Dev mode: parse without verification
+  } else if (IS_DEV_MODE) {
+    // Dev mode only: parse without verification
     try {
       event = JSON.parse(body);
     } catch {
       return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
+  } else {
+    // Production without STRIPE_WEBHOOK_SECRET should never reach here
+    // (env.ts throws on startup), but guard defensively
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
 
   console.log(`[Stripe Webhook] ${event.type}`);

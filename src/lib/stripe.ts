@@ -1,8 +1,7 @@
 import Stripe from "stripe";
+import { STRIPE_SECRET_KEY } from "@/lib/env";
 
-// Initialize Stripe with secret key
-// In production, set STRIPE_SECRET_KEY in environment
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
+export const stripe = new Stripe(STRIPE_SECRET_KEY, {
   apiVersion: "2026-01-28.clover",
   typescript: true,
 });
@@ -11,8 +10,8 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_place
 export const PLANS = {
   starter: {
     name: "Starter",
-    monthlyPriceId: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || "price_starter_monthly",
-    annualPriceId: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || "price_starter_annual",
+    monthlyPriceId: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID ?? "",
+    annualPriceId: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID ?? "",
     monthlyPrice: 29,
     annualPrice: 23,
     limits: {
@@ -32,8 +31,8 @@ export const PLANS = {
   },
   growth: {
     name: "Growth",
-    monthlyPriceId: process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID || "price_growth_monthly",
-    annualPriceId: process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID || "price_growth_annual",
+    monthlyPriceId: process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID ?? "",
+    annualPriceId: process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID ?? "",
     monthlyPrice: 59,
     annualPrice: 47,
     limits: {
@@ -54,8 +53,8 @@ export const PLANS = {
   },
   pro: {
     name: "Pro",
-    monthlyPriceId: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || "price_pro_monthly",
-    annualPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "price_pro_annual",
+    monthlyPriceId: process.env.STRIPE_PRO_MONTHLY_PRICE_ID ?? "",
+    annualPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID ?? "",
     monthlyPrice: 99,
     annualPrice: 79,
     limits: {

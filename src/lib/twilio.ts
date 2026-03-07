@@ -1,22 +1,19 @@
 import Twilio from "twilio";
 import { getBaseUrl } from "@/lib/stripe";
 import { normalizePhone } from "@/lib/phone";
-
-// ─── Configuration ──────────────────────────────────────
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID || "";
-const authToken = process.env.TWILIO_AUTH_TOKEN || "";
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || "";
-const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID || "";
-
-const isDevMode =
-  !accountSid ||
-  !authToken ||
-  accountSid === "your_twilio_account_sid" ||
-  authToken === "your_twilio_auth_token";
+import {
+  TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN,
+  TWILIO_PHONE_NUMBER,
+  TWILIO_MESSAGING_SERVICE_SID,
+  IS_DEV_MODE,
+} from "@/lib/env";
 
 // Singleton Twilio client (null in dev mode)
-const twilioClient = isDevMode ? null : Twilio(accountSid, authToken);
+const twilioClient =
+  TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN
+    ? Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    : null;
 
 // ─── Keywords ───────────────────────────────────────────
 
@@ -37,8 +34,8 @@ export function validateTwilioSignature(
   params: Record<string, string>,
   signature: string
 ): boolean {
-  if (isDevMode) return true;
-  return Twilio.validateRequest(authToken, signature, url, params);
+  if (IS_DEV_MODE) return true;
+  return Twilio.validateRequest(TWILIO_AUTH_TOKEN, signature, url, params);
 }
 
 // ─── Send SMS ───────────────────────────────────────────
@@ -86,9 +83,9 @@ export async function sendFollowUpSMS({
 
   const message = await twilioClient.messages.create({
     body: smsBody,
-    ...(messagingServiceSid
-      ? { messagingServiceSid }
-      : { from: twilioPhoneNumber }),
+    ...(TWILIO_MESSAGING_SERVICE_SID
+      ? { messagingServiceSid: TWILIO_MESSAGING_SERVICE_SID }
+      : { from: TWILIO_PHONE_NUMBER }),
     to: normalizedTo,
     ...(isPublicUrl && {
       statusCallback: `${baseUrl}/api/webhooks/twilio`,
