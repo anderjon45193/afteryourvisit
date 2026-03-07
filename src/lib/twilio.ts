@@ -1,5 +1,6 @@
 import Twilio from "twilio";
 import { getBaseUrl } from "@/lib/stripe";
+import { normalizePhone } from "@/lib/phone";
 
 // ─── Configuration ──────────────────────────────────────
 
@@ -24,16 +25,8 @@ export const OPT_IN_KEYWORDS = ["start", "yes", "unstop"];
 
 // ─── Helpers ────────────────────────────────────────────
 
-/**
- * Normalize a phone number to E.164 format (+1XXXXXXXXXX).
- * Strips all non-digit characters, prepends +1 for 10-digit US numbers.
- */
-export function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
-}
+// Re-export normalizePhone from the canonical phone utility module
+export { normalizePhone } from "@/lib/phone";
 
 /**
  * Validate a Twilio webhook signature.

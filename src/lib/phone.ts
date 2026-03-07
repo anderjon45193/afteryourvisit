@@ -19,6 +19,17 @@ export function maskPhone(phone: string): string {
   return `(${digits.slice(0, 3)}) •••-${digits.slice(6)}`;
 }
 
+/**
+ * Normalize a phone number to E.164 format (+1XXXXXXXXXX).
+ * Strips all non-digit characters, prepends +1 for 10-digit US numbers.
+ */
+export function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return `+${digits}`;
+}
+
 /** Format phone as a tel: href: tel:+15551234567 */
 export function phoneToTelHref(phone: string): string {
   const digits = toDigits(phone);

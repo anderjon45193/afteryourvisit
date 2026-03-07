@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { normalizePhone } from "@/lib/phone";
 
 // GET /api/contacts — List contacts (paginated, filterable)
 export async function GET(request: NextRequest) {
@@ -87,10 +88,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate and normalize phone to E.164
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      return NextResponse.json(
+        { error: "Invalid phone number" },
+        { status: 400 }
+      );
+    }
+    const normalized = normalizePhone(phone);
+
     // Check duplicate by phone + businessId (unique constraint)
     const existing = await prisma.contact.findUnique({
       where: {
-        phone_businessId: { phone, businessId: business!.id },
+        phone_businessId: { phone: normalized, businessId: business!.id },
       },
     });
     if (existing) {
@@ -104,7 +115,7 @@ export async function POST(request: Request) {
       data: {
         firstName,
         lastName: lastName || null,
-        phone,
+        phone: normalized,
         email: email || null,
         tags: tags || [],
         source: "manual",

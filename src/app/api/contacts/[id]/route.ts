@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { normalizePhone } from "@/lib/phone";
 
 // GET /api/contacts/:id — Get single contact + follow-up history
 export async function GET(
@@ -55,6 +56,11 @@ export async function PUT(
     if (body[field] !== undefined) {
       data[field] = body[field];
     }
+  }
+
+  // Normalize phone to E.164 if provided
+  if (typeof data.phone === "string") {
+    data.phone = normalizePhone(data.phone as string);
   }
 
   const updated = await prisma.contact.update({

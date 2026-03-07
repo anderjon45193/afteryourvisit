@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedBusiness } from "@/lib/api-utils";
 import { prisma } from "@/lib/db";
+import { normalizePhone } from "@/lib/phone";
 
 // POST /api/contacts/import — Import contacts from CSV
 export async function POST(request: Request) {
@@ -57,22 +58,19 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const formattedPhone =
-      digits.length >= 10
-        ? `(${digits.slice(-10, -7)}) ${digits.slice(-7, -4)}-${digits.slice(-4)}`
-        : phone;
+    const normalized = normalizePhone(phone);
 
-    if (existingPhones.has(formattedPhone)) {
+    if (existingPhones.has(normalized)) {
       skippedCount++;
       continue;
     }
 
-    if (batchPhones.has(formattedPhone)) {
+    if (batchPhones.has(normalized)) {
       skippedCount++;
       continue;
     }
 
-    batchPhones.add(formattedPhone);
+    batchPhones.add(normalized);
 
     const parsedTags = tags
       ? Array.isArray(tags) ? tags : [tags]
@@ -81,7 +79,7 @@ export async function POST(request: Request) {
     contactsToCreate.push({
       firstName,
       lastName: lastName || null,
-      phone: formattedPhone,
+      phone: normalized,
       email: email || null,
       tags: parsedTags,
       source: "csv_import",

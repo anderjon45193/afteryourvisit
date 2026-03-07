@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
+import { formatPhoneDisplay } from "@/lib/phone";
 
 interface Template {
   id: string;
@@ -47,7 +48,9 @@ interface ContactSuggestion {
 }
 
 function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 10);
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+  digits = digits.slice(0, 10);
   if (digits.length === 0) return "";
   if (digits.length <= 3) return `(${digits}`;
   if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
@@ -140,7 +143,7 @@ function SendFollowUpPage() {
         .then((data) => {
           if (data.firstName) {
             setFirstName(data.firstName);
-            setPhone(data.phone || "");
+            setPhone(formatPhone(data.phone || ""));
             setSelectedContact(data.id);
           }
         })
@@ -175,7 +178,7 @@ function SendFollowUpPage() {
 
   const selectSuggestion = (suggestion: ContactSuggestion) => {
     setFirstName(suggestion.firstName);
-    setPhone(suggestion.phone);
+    setPhone(formatPhone(suggestion.phone));
     setSelectedContact(suggestion.id);
     setShowSuggestions(false);
     setContactSuggestions([]);
@@ -322,7 +325,7 @@ function SendFollowUpPage() {
                             <p className="text-sm font-medium text-warm-800 truncate">
                               {s.firstName} {s.lastName || ""}
                             </p>
-                            <p className="text-xs text-warm-400">{s.phone}</p>
+                            <p className="text-xs text-warm-400">{formatPhoneDisplay(s.phone)}</p>
                           </div>
                           <span className="text-[10px] text-warm-300">
                             {relativeDate(s.lastFollowUpAt)}

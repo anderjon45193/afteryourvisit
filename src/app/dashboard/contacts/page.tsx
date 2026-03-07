@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { TagInput } from "@/components/dashboard/tag-input";
 import { MaskedPhone } from "@/components/shared/masked-phone";
+import { formatPhoneDisplay } from "@/lib/phone";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
@@ -309,7 +310,7 @@ function ContactsPage() {
     setEditForm({
       firstName: detailContact.firstName,
       lastName: detailContact.lastName || "",
-      phone: detailContact.phone,
+      phone: formatPhoneDisplay(detailContact.phone),
       email: detailContact.email || "",
       notes: detailContact.notes || "",
       tags: [...detailContact.tags],
@@ -347,9 +348,7 @@ function ContactsPage() {
   const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   const formatPhone = (v: string) => {
     let digits = v.replace(/\D/g, "");
-    // Strip leading country code 1
     if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
-    // Cap at 10 digits
     digits = digits.slice(0, 10);
     if (digits.length === 0) return "";
     if (digits.length <= 3) return `(${digits}`;
@@ -1102,7 +1101,7 @@ function ContactsPage() {
                       <div className="bg-warm-50 rounded-xl p-4 space-y-2.5">
                         <div className="flex items-center gap-2.5">
                           <Phone className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
-                          <span className="text-[14px] text-warm-700">{detailContact.phone}</span>
+                          <span className="text-[14px] text-warm-700">{formatPhoneDisplay(detailContact.phone)}</span>
                         </div>
                         {detailContact.email && (
                           <div className="flex items-center gap-2.5">
